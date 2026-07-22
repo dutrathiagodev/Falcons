@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Falcons Vôlei - Gestão de Atlética
 
-## Getting Started
+<p align="center">
+Centro de comando e gestão esportiva para o time de vôlei da Atlética FAP. <br/>
+<a href="https://falcons-wine.vercel.app">Clique aqui para acessar o sistema online.</a>
+</p>
 
-First, run the development server:
+<p align="center">
+  <a href="#-tecnologias">Tecnologias</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+  <a href="#-projeto">Projeto</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+  <a href="#-funcionalidades">Funcionalidades</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+  <a href="#memo-licença">Licença</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
+  <a href="#-desenvolvedor">Desenvolvedor</a>
+</p>
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+<p align="center">
+  <img alt="License" src="https://img.shields.io/static/v1?label=license&message=MIT&color=49AA26&labelColor=000000">
+</p>
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+<br>
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+<p align="center">
+  <img alt="projeto Falcons Volei" src=".github/preview.png" width="100%">
+</p>
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🚀 Tecnologias
 
-## Learn More
+Esse projeto foi desenvolvido com as seguintes tecnologias:
 
-To learn more about Next.js, take a look at the following resources:
+- HTML5 e CSS3
+- JavaScript (ES6+)
+- React
+- Vite
+- Git e GitHub
+- Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 💻 Projeto
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+O **Falcons Vôlei** é um painel completo de gestão esportiva desenvolvido para a Atlética FAP. A plataforma permite centralizar a leitura do elenco, controlar a agenda competitiva e analisar o momento técnico do time para tomada de decisões estratégicas em treinos e campeonatos.
 
-## Deploy on Vercel
+- [Acesse o projeto finalizado, online](https://falcons-wine.vercel.app)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## ✨ Funcionalidades
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 📊 **Dashboard Geral:** Leitura rápida de estatísticas do time, saldo de sets, aproveitamento e compromissos do elenco.
+- 👥 **Gestão do Elenco (Atletas):** Cadastro completo de jogadores, controle de disponibilidade, definição de posições e números de camisa.
+- 🏐 **Escalação e Rotações (Tático):** Montagem de sextetos com visualização interativa de quadra e gerenciamento de rotações táticas.
+- 📈 **Leitura Estatística:** Acompanhamento de fundamentos por atleta (passe, ataque, etc.), overall e rankings de performance.
+- 📅 **Calendário Esportivo (Jogos):** Agendamento e gestão de campeonatos, amistosos, treinos e reuniões com visualização mensal.
+
+## :memo: Licença
+
+Esse projeto está sob a licença MIT.
+
+---
+
+Desenvolvido por **Thiago Dutra**.
+
+- **GitHub:** [@dutrathiagodev](https://github.com/dutrathiagodev)
+- **LinkedIn:** [Thiago Dutra de Oliveira](https://linkedin.com/in/dutrathiagodev)
