@@ -58,3 +58,25 @@ Desenvolvido por **Thiago Dutra**.
 
 - **GitHub:** [@dutrathiagodev](https://github.com/dutrathiagodev)
 - **LinkedIn:** [Thiago Dutra de Oliveira](https://linkedin.com/in/dutrathiagodev)
+
+## 🛠️ Arquitetura e API
+
+Tudo em um unico repositorio Next.js. O navegador nunca fala direto com o Supabase: leituras acontecem nas paginas (Server Components) e escritas passam pela API em `src/app/api`.
+
+| Rota | Metodo | Uso |
+| --- | --- | --- |
+| `/api/players`, `/api/games`, `/api/stats` | `POST` | cria (stats faz upsert por jogo + atleta) |
+| `/api/players/:id`, `/api/games/:id`, `/api/stats/:id` | `PATCH`, `DELETE` | edita e remove |
+| `/api/photos` | `POST` | envia foto (JPG/PNG/WEBP, ate 2 MB) |
+| `/api/auth/login`, `/api/auth/logout` | `POST` | sessao via Supabase Auth |
+
+Para criar um novo recurso, adicione a tabela e as colunas permitidas em `src/lib/api.ts` (`resources`).
+
+Estrutura (segue `docs/architecture`): `src/app` (rotas), `src/components/{layout,sections,ui}`, `src/lib` (helpers e Supabase), `public`.
+
+## 🔐 Configuracao
+
+1. Crie `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+2. Aplique as migrations de `supabase/migrations` (a ultima fecha o acesso anonimo ao banco).
+3. No painel do Supabase: **Authentication → Sign In / Providers → desative "Allow new users to sign up"** e crie os usuarios do time manualmente.
+4. `npm install` e `npm run dev`.

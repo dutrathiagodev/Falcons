@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "./sidebar-context";
 import {
   BarChart3,
   CalendarRange,
   ChevronLeft,
   LayoutDashboard,
+  LogOut,
   Menu,
   Users,
   Volleyball,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/api-client";
 
 const navItems = [
   {
@@ -50,7 +52,16 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { isOpen, toggleSidebar } = useSidebar();
+
+  async function handleLogout() {
+    await apiRequest("/api/auth/logout", "POST").catch(() => {});
+    router.replace("/login");
+    router.refresh();
+  }
+
+  if (pathname === "/login") return null;
 
   return (
     <>
@@ -115,6 +126,11 @@ export default function Sidebar() {
               );
             })}
           </nav>
+
+          <button className="btn btn-secondary" type="button" onClick={handleLogout}>
+            <LogOut size={16} />
+            Sair
+          </button>
 
           <div className="sidebar-foot-card">
             <span className="sidebar-foot-chip">Temporada 2026</span>

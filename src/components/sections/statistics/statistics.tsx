@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import TopBar from "@/components/layout/top-bar";
 import OverallCard from "@/components/sections/overall-card/overall-card";
-import { createClient } from "@/lib/supabase/client";
+import { apiRequest } from "@/lib/api-client";
 import {
   BarChart3,
   ClipboardList,
@@ -182,7 +182,6 @@ export default function StatisticsClient({
   initialPerformance: PerformanceRecord[];
   players: PlayerRecord[];
 }) {
-  const supabase = createClient();
   const [activeTab, setActiveTab] = useState<"team" | "players" | "register">(
     "team",
   );
@@ -295,33 +294,23 @@ export default function StatisticsClient({
         observacoes: form.observacoes.trim() || null,
       };
 
-      const { data, error } = await supabase
-        .from("estatisticas_individuais")
-        .upsert([body], { onConflict: "evento_id,jogador_id" })
-        .select();
+      const saved = await apiRequest<PerformanceRecord>("/api/stats", "POST", body);
 
-      if (error) throw error;
+      setRecords((current) => {
+        const hasCurrent = current.some((record) => record.id === saved.id);
+        if (hasCurrent) {
+          return current.map((record) => (record.id === saved.id ? saved : record));
+        }
 
-      if (data?.[0]) {
-        setRecords((current) => {
-          const hasCurrent = current.some((record) => record.id === data[0].id);
-          if (hasCurrent) {
-            return current.map((record) =>
-              record.id === data[0].id ? data[0] : record,
-            );
-          }
+        const replacedByKey = current.map((record) =>
+          record.evento_id === saved.evento_id && record.jogador_id === saved.jogador_id
+            ? saved
+            : record,
+        );
 
-          const replacedByKey = current.map((record) =>
-            record.evento_id === data[0].evento_id &&
-            record.jogador_id === data[0].jogador_id
-              ? data[0]
-              : record,
-          );
-
-          const foundKey = replacedByKey.some((record) => record.id === data[0].id);
-          return foundKey ? replacedByKey : [...replacedByKey, data[0]];
-        });
-      }
+        const foundKey = replacedByKey.some((record) => record.id === saved.id);
+        return foundKey ? replacedByKey : [...replacedByKey, saved];
+      });
 
       setFeedback({ type: "success", text: "Desempenho registrado com sucesso." });
     } catch (error: unknown) {
