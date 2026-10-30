@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { apiRequest } from "@/lib/api-client";
 import TopBar from "@/components/layout/top-bar";
 import {
   BadgePlus,
@@ -86,7 +86,6 @@ export default function PlayersClient({
   initialPlayers: Player[];
   initialPerformance: PerformanceRecord[];
 }) {
-  const supabase = createClient();
   const [players, setPlayers] = useState(initialPlayers);
   const [performanceRecords] = useState(initialPerformance);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,21 +196,14 @@ export default function PlayersClient({
   async function uploadPhotoIfNeeded() {
     if (!form.fotoFile) return form.fotoUrl;
 
-    await supabase.storage
-      .createBucket("fotos-jogadores", { public: true })
-      .catch(() => {});
+    const upload = new FormData();
+    upload.append("file", form.fotoFile);
 
-    const extension = form.fotoFile.name.split(".").pop();
-    const slug = `${form.nome.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.${extension}`;
+    const response = await fetch("/api/photos", { method: "POST", body: upload });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error ?? "Falha ao enviar a foto.");
 
-    const { error: uploadError } = await supabase.storage
-      .from("fotos-jogadores")
-      .upload(slug, form.fotoFile, { upsert: true });
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from("fotos-jogadores").getPublicUrl(slug);
-    return data.publicUrl;
+    return payload.url as string;
   }
 
   async function savePlayer() {
@@ -242,30 +234,13 @@ export default function PlayersClient({
       };
 
       if (form.id) {
-        const { data, error } = await supabase
-          .from("jogadores_leilao")
-          .update(body)
-          .eq("id", form.id)
-          .select();
-
-        if (error) throw error;
-
-        if (data?.[0]) {
-          setPlayers((current) =>
-            current.map((player) => (player.id === form.id ? data[0] : player)),
-          );
-        }
+        const saved = await apiRequest<Player>(`/api/players/${form.id}`, "PATCH", body);
+        setPlayers((current) =>
+          current.map((player) => (player.id === form.id ? saved : player)),
+        );
       } else {
-        const { data, error } = await supabase
-          .from("jogadores_leilao")
-          .insert([body])
-          .select();
-
-        if (error) throw error;
-
-        if (data?.[0]) {
-          setPlayers((current) => [...current, data[0]]);
-        }
+        const saved = await apiRequest<Player>("/api/players", "POST", body);
+        setPlayers((current) => [...current, saved]);
       }
 
       closeModal();
@@ -279,9 +254,10 @@ export default function PlayersClient({
   async function deletePlayer(id: string, playerName: string) {
     if (!confirm(`Deseja remover ${playerName} do elenco?`)) return;
 
-    const { error } = await supabase.from("jogadores_leilao").delete().eq("id", id);
-    if (error) {
-      alert(`Erro ao excluir: ${error.message}`);
+    try {
+      await apiRequest(`/api/players/${id}`, "DELETE");
+    } catch (error) {
+      alert(`Erro ao excluir: ${getErrorMessage(error)}`);
       return;
     }
 
