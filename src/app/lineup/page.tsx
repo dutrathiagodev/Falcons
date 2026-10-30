@@ -1,5 +1,5 @@
-import { createClient } from "@/backend/lib/server";
-import LineupClient from "./LineupClient";
+import { createClient } from "@/lib/supabase/server";
+import LineupClient from "@/components/sections/lineup/lineup";
 
 export default async function LineupPage() {
   const supabase = await createClient();

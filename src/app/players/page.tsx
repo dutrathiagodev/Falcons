@@ -1,5 +1,5 @@
-import { createClient } from "@/backend/lib/server";
-import PlayersClient from "./PlayersClient";
+import { createClient } from "@/lib/supabase/server";
+import PlayersClient from "@/components/sections/players/players";
 
 export default async function PlayersPage() {
   const supabase = await createClient();

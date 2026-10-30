@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { updateSession } from "@/shared/utils/supabase/middleware";
+import { updateSession } from "@/lib/supabase/middleware";
 
 const cspDirectives = [
   "default-src 'self'",
@@ -26,7 +26,7 @@ function applySecurityHeaders(response: NextResponse) {
   return response;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = await updateSession(request);
   return applySecurityHeaders(response);
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useSidebar } from "./SidebarContext";
+import { useSidebar } from "./sidebar-context";
 import {
   BarChart3,
   CalendarRange,
@@ -13,7 +13,7 @@ import {
   Users,
   Volleyball,
 } from "lucide-react";
-import { cn } from "@/backend/lib/utils";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   {

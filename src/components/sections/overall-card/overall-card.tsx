@@ -1,7 +1,7 @@
 "use client";
 
-import type { PlayerRatings, PlayerRecord } from "@/shared/lib/volleyball";
-import { getEventTypeMeta, getInitials } from "@/shared/lib/volleyball";
+import type { PlayerRatings, PlayerRecord } from "@/lib/volleyball";
+import { getEventTypeMeta, getInitials } from "@/lib/volleyball";
 
 const STAT_LABELS: Array<{
   key: keyof Omit<PlayerRatings, "overall" | "trendScore">;
