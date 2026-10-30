@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { apiRequest } from "@/lib/api-client";
 import TopBar from "@/components/layout/top-bar";
 import {
   CalendarPlus,
@@ -64,7 +64,6 @@ export default function GamesClient({
 }: {
   initialEvents: EventRecord[];
 }) {
-  const supabase = createClient();
   const [events, setEvents] = useState<EventRecord[]>(initialEvents);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const base = new Date();
@@ -152,23 +151,13 @@ export default function GamesClient({
       };
 
       if (form.id) {
-        const { data, error } = await supabase
-          .from("jogos")
-          .update(body)
-          .eq("id", form.id)
-          .select();
-        if (error) throw error;
-        if (data?.[0]) {
-          setEvents((current) =>
-            current.map((event) => (event.id === form.id ? data[0] : event)),
-          );
-        }
+        const saved = await apiRequest<EventRecord>(`/api/games/${form.id}`, "PATCH", body);
+        setEvents((current) =>
+          current.map((event) => (event.id === form.id ? saved : event)),
+        );
       } else {
-        const { data, error } = await supabase.from("jogos").insert([body]).select();
-        if (error) throw error;
-        if (data?.[0]) {
-          setEvents((current) => [data[0], ...current]);
-        }
+        const saved = await apiRequest<EventRecord>("/api/games", "POST", body);
+        setEvents((current) => [saved, ...current]);
       }
 
       setFeedback({ type: "success", text: "Evento salvo com sucesso." });
@@ -186,9 +175,13 @@ export default function GamesClient({
   async function deleteEvent(id: string) {
     if (!confirm("Remover este evento do calendario?")) return;
 
-    const { error } = await supabase.from("jogos").delete().eq("id", id);
-    if (error) {
-      setFeedback({ type: "error", text: error.message });
+    try {
+      await apiRequest(`/api/games/${id}`, "DELETE");
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        text: error instanceof Error ? error.message : "Falha ao remover evento.",
+      });
       return;
     }
 
