@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
+import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 
 export default function Login() {
@@ -61,71 +63,95 @@ export default function Login() {
   }
 
   return (
-    <div className="page-shell">
-      {step === "password" ? (
-        <form className="panel" onSubmit={handlePassword} style={{ maxWidth: 420, margin: "10vh auto 0" }}>
-          <h1 className="card-title">Entrar no painel</h1>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">E-mail</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              className="form-input"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="auth-brand">
+          <Image src="/falcons-logo.png" alt="" width={48} height={48} className="auth-brand-logo" priority />
+          <div>
+            <strong>Falcons Volei</strong>
+            <span>Atletica FAP</span>
           </div>
+        </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">Senha</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              className="form-input"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </div>
+        {step === "password" ? (
+          <form className="auth-form" onSubmit={handlePassword}>
+            <span className="page-hero-kicker">
+              <LockKeyhole size={14} />
+              Acesso restrito
+            </span>
+            <h1 className="auth-title">Entrar no painel</h1>
+            <p className="auth-subtitle">Use o e-mail e a senha cadastrados pela comissao.</p>
 
-          {error && <p role="alert">{error}</p>}
+            <div className="form-group">
+              <label className="form-label" htmlFor="email">E-mail</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                className="form-input"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
 
-          <button className="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
-      ) : (
-        <form className="panel" onSubmit={handleCode} style={{ maxWidth: 420, margin: "10vh auto 0" }}>
-          <h1 className="card-title">Verificação em duas etapas</h1>
-          <p>Digite o código de 6 dígitos do seu aplicativo autenticador.</p>
+            <div className="form-group">
+              <label className="form-label" htmlFor="password">Senha</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                className="form-input"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="code">Código</label>
-            <input
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              className="form-input"
-              value={code}
-              onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
-              autoFocus
-              required
-            />
-          </div>
+            {error && <p className="auth-error" role="alert">{error}</p>}
 
-          {error && <p role="alert">{error}</p>}
+            <button className="btn btn-primary auth-submit" type="submit" disabled={loading}>
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={handleCode}>
+            <span className="page-hero-kicker">
+              <ShieldCheck size={14} />
+              Verificacao em duas etapas
+            </span>
+            <h1 className="auth-title">Confirme o codigo</h1>
+            <p className="auth-subtitle">Digite o codigo de 6 digitos do seu aplicativo autenticador.</p>
 
-          <button className="btn btn-primary" type="submit" disabled={loading || code.length !== 6}>
-            {loading ? "Verificando..." : "Confirmar"}
-          </button>
-        </form>
-      )}
+            <div className="form-group">
+              <label className="form-label" htmlFor="code">Código</label>
+              <input
+                id="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                className="form-input"
+                value={code}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+                autoFocus
+                required
+              />
+            </div>
+
+            {error && <p className="auth-error" role="alert">{error}</p>}
+
+            <button className="btn btn-primary auth-submit" type="submit" disabled={loading || code.length !== 6}>
+              {loading ? "Verificando..." : "Confirmar"}
+            </button>
+          </form>
+        )}
+
+        <p className="auth-footnote">
+          <ShieldCheck size={14} />
+          Conexao protegida. Dados dos atletas visiveis so para a comissao.
+        </p>
+      </div>
     </div>
   );
 }
