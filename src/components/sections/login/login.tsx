@@ -2,17 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 
-export default function Login() {
+export default function Login({ initialStep }: { initialStep: "password" | "code" }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   // The proxy sends sessions that still owe the 2FA code straight to the code step.
-  const [step, setStep] = useState<"password" | "code">(
-    searchParams.get("etapa") === "codigo" ? "code" : "password",
-  );
+  const [step, setStep] = useState(initialStep);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
