@@ -1,60 +1,121 @@
-# Falcons Vôlei - Gestão de Atlética
+<!-- markdownlint-disable MD033 -->
+<div align="center">
 
-<p align="center">
-Centro de comando e gestão esportiva para o time de vôlei da Atlética FAP. <br/>
-<a href="https://falcons-wine.vercel.app">Clique aqui para acessar o sistema online.</a>
-</p>
+# Falcons Vôlei — Gestão de Atlética
 
-<p align="center">
-  <a href="#-tecnologias">Tecnologias</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
-  <a href="#-projeto">Projeto</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
-  <a href="#-funcionalidades">Funcionalidades</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
-  <a href="#memo-licença">Licença</a>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;
-  <a href="#-desenvolvedor">Desenvolvedor</a>
-</p>
+**Sistema de gestão do time de vôlei da Atlética FAP: elenco, escalação, jogos e estatísticas.**
 
-<p align="center">
-  <img alt="License" src="https://img.shields.io/static/v1?label=license&message=MIT&color=49AA26&labelColor=000000">
-</p>
+[![Site](https://img.shields.io/badge/site-online-FFFFFF?style=for-the-badge&labelColor=0B0B0B)](https://falcons-painel.vercel.app)
 
-<br>
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-database-3ECF8E?logo=supabase&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-deploy-000000?logo=vercel&logoColor=white)
 
-<p align="center">
-  <img alt="projeto Falcons Volei" src=".github/preview.png" width="100%">
-</p>
+![Tela principal do painel](docs/images/tela-principal.png)
 
-## 🚀 Tecnologias
+</div>
 
-Esse projeto foi desenvolvido com as seguintes tecnologias:
+## Sobre
 
-- HTML5 e CSS3
-- JavaScript (ES6+)
-- React
-- Vite
-- Git e GitHub
-- Vercel
+Painel profissional de gestão esportiva para o time de vôlei da Atlética FAP, em tema escuro. Centraliza a leitura do elenco, a agenda competitiva e o desempenho individual para apoiar as decisões da comissão técnica em treinos e campeonatos. O sistema guarda dados pessoais dos atletas, por isso o acesso é restrito a usuários autenticados e todas as escritas passam por uma API própria com validação.
 
-## 💻 Projeto
+## Links
 
-O **Falcons Vôlei** é um painel completo de gestão esportiva desenvolvido para a Atlética FAP. A plataforma permite centralizar a leitura do elenco, controlar a agenda competitiva e analisar o momento técnico do time para tomada de decisões estratégicas em treinos e campeonatos.
+| | |
+|---|---|
+| Sistema publicado | https://falcons-painel.vercel.app |
+| Repositório | https://github.com/dutrathiagodev/Falcons |
+| LinkedIn | [dutrathiagodev](https://www.linkedin.com/in/dutrathiagodev/) |
+| GitHub | [dutrathiagodev](https://github.com/dutrathiagodev) |
 
-- [Acesse o projeto finalizado, online](https://falcons-wine.vercel.app)
+## O que tem no sistema
 
-## ✨ Funcionalidades
+- **Dashboard** com atletas no elenco, aproveitamento, saldo de sets, overall da atlética, distribuição por posição, próximos compromissos e últimos resultados
+- **Atletas**, com cadastro completo, disponibilidade, posição, camisa, dados físicos e foto
+- **Escalação**, com montagem do sexteto, visualização da quadra e rotações
+- **Estatísticas**, com fundamentos por atleta (passe, saque, ataque, bloqueio), overall individual e rankings
+- **Jogos**, em calendário mensal com campeonatos, amistosos, treinos e reuniões, além de placar e resultado
+- **Login** com Supabase Auth: sem sessão, todas as rotas redirecionam para `/login`
+- Layout responsivo (desktop, tablet e celular)
 
-- 📊 **Dashboard Geral:** Leitura rápida de estatísticas do time, saldo de sets, aproveitamento e compromissos do elenco.
-- 👥 **Gestão do Elenco (Atletas):** Cadastro completo de jogadores, controle de disponibilidade, definição de posições e números de camisa.
-- 🏐 **Escalação e Rotações (Tático):** Montagem de sextetos com visualização interativa de quadra e gerenciamento de rotações táticas.
-- 📈 **Leitura Estatística:** Acompanhamento de fundamentos por atleta (passe, ataque, etc.), overall e rankings de performance.
-- 📅 **Calendário Esportivo (Jogos):** Agendamento e gestão de campeonatos, amistosos, treinos e reuniões com visualização mensal.
+## Segurança
 
-## :memo: Licença
+- Somente usuários autenticados acessam; o cadastro público fica desativado e os usuários são criados pela administração
+- O navegador nunca fala direto com o banco: leituras no servidor e escritas pela API
+- A API valida origem (CSRF), sessão, tabelas e colunas permitidas
+- RLS ligado em todas as tabelas, sem acesso anônimo
+- Upload de foto limitado a JPG, PNG ou WEBP de até 2 MB
+- Headers de segurança (CSP, X-Frame-Options, nosniff) aplicados em `src/proxy.ts`
 
-Esse projeto está sob a licença MIT.
+Regras completas e checklist de PR em [`docs/architecture/feature.security.md`](docs/architecture/feature.security.md).
 
----
+## API
 
-Desenvolvido por **Thiago Dutra**.
+| Rota | Método | Uso |
+|---|---|---|
+| `/api/players`, `/api/games`, `/api/stats` | `POST` | cria (stats faz upsert por jogo e atleta) |
+| `/api/players/:id`, `/api/games/:id`, `/api/stats/:id` | `PATCH`, `DELETE` | edita e remove |
+| `/api/photos` | `POST` | envia foto de atleta |
+| `/api/auth/login`, `/api/auth/logout` | `POST` | sessão via Supabase Auth |
 
-- **GitHub:** [@dutrathiagodev](https://github.com/dutrathiagodev)
-- **LinkedIn:** [Thiago Dutra de Oliveira](https://linkedin.com/in/dutrathiagodev)
+Para criar um recurso novo, registre a tabela e as colunas permitidas em `src/lib/api.ts` (`resources`).
+
+## Tecnologias
+
+- [Next.js 16](https://nextjs.org) (App Router, Server Components e Route Handlers) e [React 19](https://react.dev)
+- [TypeScript](https://www.typescriptlang.org)
+- [Tailwind CSS 4](https://tailwindcss.com)
+- [Supabase](https://supabase.com) (PostgreSQL com RLS, Auth e Storage)
+- [Vitest](https://vitest.dev) e ESLint
+- GitHub Actions para o CI
+- [Vercel](https://vercel.com) para o deploy
+
+## Como rodar
+
+Pré-requisito: Node.js 20 ou superior.
+
+1. Crie o `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+2. Aplique as migrations de `supabase/migrations` (a última fecha o acesso anônimo ao banco).
+3. No Supabase, em Authentication, desative o cadastro público e crie os usuários do time.
+
+```bash
+npm install
+npm run dev     # desenvolvimento em http://localhost:3000
+npm run lint    # lint
+npm test        # testes
+npm run build   # build de produção
+npm run start   # serve o build
+```
+
+## Estrutura
+
+```text
+src/
+  app/                  layout, páginas (uma pasta por rota), API (api/), estilos globais
+  components/
+    layout/             sidebar e top-bar
+    sections/<secao>/   uma pasta por tela (dashboard, players, games, lineup, statistics, login)
+  lib/                  regras de vôlei, helpers da API e clientes do Supabase
+  proxy.ts              sessão, redirecionamento para login e headers de segurança
+public/                 logo e imagens
+supabase/
+  migrations/           esquema do banco e policies (RLS)
+docs/
+  architecture/         regras de arquitetura e segurança
+  images/               imagens usadas na documentação (print da tela principal)
+```
+
+Cada página em `src/app` busca os dados no servidor e entrega a uma seção. As regras completas estão em [`docs/architecture`](docs/architecture).
+
+## Publicação
+
+O deploy é feito na Vercel a partir do GitHub, que detecta o Next.js e roda `npm run build`. As variáveis `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ficam configuradas no painel da Vercel, nunca no repositório. A cada pull request o CI roda lint, testes e build.
+
+## Contato
+
+- 📧 [thiagodutrasap@gmail.com](mailto:thiagodutrasap@gmail.com)
+- 💼 [LinkedIn](https://www.linkedin.com/in/dutrathiagodev/)
+- 🐙 [GitHub](https://github.com/dutrathiagodev)
