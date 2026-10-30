@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { fail, hasSameOrigin } from "@/lib/api";
+import { fail, hasSameOrigin, needsSecondFactor } from "@/lib/api";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -15,5 +15,5 @@ export async function POST(request: NextRequest) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return fail("E-mail ou senha invalidos.", 401);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, mfaRequired: await needsSecondFactor(supabase) });
 }

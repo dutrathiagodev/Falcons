@@ -40,6 +40,20 @@ export const updateSession = async (request: NextRequest) => {
     return NextResponse.redirect(url);
   }
 
+  // Account has 2FA but this session has not passed it: only /login (code step) is allowed.
+  if (user && !isApi) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const pendingSecondFactor = aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2";
+
+    if (pendingSecondFactor) {
+      if (isLogin) return supabaseResponse;
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "?etapa=codigo";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (user && isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";

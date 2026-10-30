@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: Context) {
     .from(config.table)
     .update(body)
     .eq("id", id)
-    .select()
+    .select("returning" in config ? config.returning : "*")
     .single();
 
   if (error) {

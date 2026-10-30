@@ -78,3 +78,21 @@ O sistema guarda dados pessoais de atletas (CPF, telefone, data de nascimento, p
 2. Desligar o acesso afetado (policy ou rota) ate corrigir.
 3. Avisar a comissao tecnica e os atletas envolvidos.
 4. Registrar o que vazou, a causa e a correcao.
+
+## Configuracao obrigatoria no Supabase (painel)
+
+O codigo nao consegue garantir estes pontos sozinho; sem eles o banco fica exposto.
+
+1. **Migrations aplicadas** em ordem, incluindo `20261030120000_lock_down_rls.sql` (fecha o acesso anonimo) e `20261030140000_private_photos.sql` (fotos privadas).
+2. **Cadastro publico desativado**: Authentication → Sign In / Providers → desligar "Allow new users to sign up". Usuarios sao criados manualmente.
+3. **Chaves novas**: Settings → API Keys → usar as chaves `publishable`/`secret` e desativar as chaves JWT antigas (`anon`/`service_role`). Uma chave `anon` antiga aparece no historico publico do repositorio.
+4. **2FA para administradores**: cada admin ativa em `/conta/seguranca` (TOTP, gratis).
+5. **Senha minima**: Authentication → Policies → tamanho minimo 10 e exigir letras e numeros.
+
+## Garantias no codigo
+
+- `next` sempre na ultima versao corrigida; `npm audit --omit=dev` sem vulnerabilidades.
+- CPF e telefone nunca vao em lista: so `GET /api/players/:id/private` ao abrir um atleta para editar, sem cache.
+- Fotos em bucket privado; o banco guarda so o caminho e as telas recebem URL assinada de 1 hora.
+- Contas com 2FA: o proxy e a API so liberam a sessao depois do codigo (nivel `aal2`).
+- O header `x-powered-by` e desligado. `server: Vercel` e o certificado `*.vercel.app` vem da hospedagem e so somem com dominio proprio.

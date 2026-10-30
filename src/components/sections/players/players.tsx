@@ -33,8 +33,6 @@ type Player = {
   foto_url?: string | null;
   status?: string | null;
   data_nascimento?: string | null;
-  cpf?: string | null;
-  telefone?: string | null;
   curso?: string | null;
   peso?: number | null;
   altura?: number | null;
@@ -54,6 +52,8 @@ type PlayerFormState = {
   dataNascimento: string;
   cpf: string;
   telefone: string;
+  // cpf/telefone arrive on demand; until then they must not be sent (would wipe them).
+  privateLoaded: boolean;
   curso: string;
   peso: string;
   altura: string;
@@ -72,6 +72,7 @@ const EMPTY_FORM: PlayerFormState = {
   dataNascimento: "",
   cpf: "",
   telefone: "",
+  privateLoaded: true,
   curso: "",
   peso: "",
   altura: "",
@@ -146,8 +147,9 @@ export default function PlayersClient({
       camisa: player.camisa != null ? String(player.camisa) : "",
       status: player.status || "DISPONIVEL",
       dataNascimento: player.data_nascimento || "",
-      cpf: player.cpf || "",
-      telefone: player.telefone || "",
+      cpf: "",
+      telefone: "",
+      privateLoaded: false,
       curso: player.curso || "",
       peso: player.peso != null ? String(player.peso) : "",
       altura: player.altura != null ? String(player.altura) : "",
@@ -155,6 +157,19 @@ export default function PlayersClient({
       observacoes: player.observacoes || "",
     });
     setIsModalOpen(true);
+
+    apiRequest<{ cpf: string | null; telefone: string | null }>(
+      `/api/players/${player.id}/private`,
+      "GET",
+    )
+      .then((data) =>
+        setForm((current) =>
+          current.id === player.id
+            ? { ...current, cpf: data.cpf || "", telefone: data.telefone || "", privateLoaded: true }
+            : current,
+        ),
+      )
+      .catch((error) => alert(`Erro ao carregar dados pessoais: ${getErrorMessage(error)}`));
   }
 
   function closeModal() {
@@ -193,8 +208,8 @@ export default function PlayersClient({
     reader.readAsDataURL(file);
   }
 
-  async function uploadPhotoIfNeeded() {
-    if (!form.fotoFile) return form.fotoUrl;
+  async function uploadPhotoIfNeeded(): Promise<{ path: string; url: string | null } | null> {
+    if (!form.fotoFile) return null;
 
     const upload = new FormData();
     upload.append("file", form.fotoFile);
@@ -203,7 +218,7 @@ export default function PlayersClient({
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error ?? "Falha ao enviar a foto.");
 
-    return payload.url as string;
+    return payload;
   }
 
   async function savePlayer() {
@@ -215,32 +230,38 @@ export default function PlayersClient({
     setSaving(true);
 
     try {
-      const finalFotoUrl = await uploadPhotoIfNeeded();
-      const body = {
+      const uploaded = await uploadPhotoIfNeeded();
+      const body: Record<string, unknown> = {
         nome: form.nome.trim(),
         apelido: form.apelido.trim() || null,
         posicao: form.posicao || null,
         camisa: form.camisa ? parseInt(form.camisa, 10) : null,
         status: form.status || "DISPONIVEL",
         data_nascimento: form.dataNascimento || null,
-        cpf: form.cpf || null,
-        telefone: form.telefone || null,
         curso: form.curso || null,
         peso: form.peso ? parseFloat(form.peso) : null,
         altura: form.altura ? parseFloat(form.altura) : null,
         ano: form.ano ? parseInt(form.ano, 10) : null,
         observacoes: form.observacoes.trim() || null,
-        foto_url: finalFotoUrl || null,
       };
+      if (form.privateLoaded) {
+        body.cpf = form.cpf || null;
+        body.telefone = form.telefone || null;
+      }
+      // Only a new upload changes the stored photo path; the shown URL is a temporary signed one.
+      if (uploaded) body.foto_url = uploaded.path;
+      const displayPhoto = uploaded?.url ?? (form.fotoFile ? null : form.fotoUrl);
 
       if (form.id) {
         const saved = await apiRequest<Player>(`/api/players/${form.id}`, "PATCH", body);
         setPlayers((current) =>
-          current.map((player) => (player.id === form.id ? saved : player)),
+          current.map((player) =>
+            player.id === form.id ? { ...saved, foto_url: displayPhoto } : player,
+          ),
         );
       } else {
         const saved = await apiRequest<Player>("/api/players", "POST", body);
-        setPlayers((current) => [...current, saved]);
+        setPlayers((current) => [...current, { ...saved, foto_url: displayPhoto }]);
       }
 
       closeModal();
@@ -607,7 +628,8 @@ export default function PlayersClient({
                 className="form-input"
                 value={form.cpf}
                 onChange={(e) => handleMaskCPF(e.target.value)}
-                placeholder="000.000.000-00"
+                placeholder={form.privateLoaded ? "000.000.000-00" : "Carregando..."}
+                disabled={!form.privateLoaded}
               />
             </div>
           </div>
@@ -619,7 +641,8 @@ export default function PlayersClient({
                 className="form-input"
                 value={form.telefone}
                 onChange={(e) => handleMaskPhone(e.target.value)}
-                placeholder="(00) 00000-0000"
+                placeholder={form.privateLoaded ? "(00) 00000-0000" : "Carregando..."}
+                disabled={!form.privateLoaded}
               />
             </div>
             <div className="form-group">

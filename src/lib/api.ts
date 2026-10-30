@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { PLAYER_COLUMNS } from "@/lib/volleyball";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,6 +36,8 @@ const statFields = [
 export const resources = {
   players: {
     table: "jogadores_leilao",
+    // Responses never echo cpf/telefone back; they are read on demand by admins of the form.
+    returning: PLAYER_COLUMNS,
     fields: [
       "nome",
       "apelido",
@@ -115,9 +118,17 @@ export function hasSameOrigin(request: NextRequest) {
   }
 }
 
-/** Same-origin check (CSRF) + valid Supabase session, for every mutating route. */
-export async function authorize(request: NextRequest) {
-  if (!hasSameOrigin(request)) {
+/**
+ * Same-origin check (CSRF) + valid Supabase session + completed 2FA (when the
+ * account has it enabled). Every API route that touches data goes through this.
+ * GET routes skip the origin check: browsers omit Origin on same-origin GETs and
+ * reads cannot be forged cross-site into state changes.
+ */
+export async function authorize(
+  request: NextRequest,
+  { checkOrigin = request.method !== "GET" }: { checkOrigin?: boolean } = {},
+) {
+  if (checkOrigin && !hasSameOrigin(request)) {
     return { error: fail("Origem invalida.", 403), supabase: null, user: null };
   }
 
@@ -130,5 +141,15 @@ export async function authorize(request: NextRequest) {
     return { error: fail("Nao autenticado.", 401), supabase: null, user: null };
   }
 
+  if (await needsSecondFactor(supabase)) {
+    return { error: fail("Confirme o codigo de verificacao.", 401), supabase: null, user: null };
+  }
+
   return { error: null, supabase, user };
+}
+
+/** True when the account has 2FA enabled but this session has not passed it yet. */
+export async function needsSecondFactor(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.nextLevel === "aal2" && data.currentLevel !== "aal2";
 }
