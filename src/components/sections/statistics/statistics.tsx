@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import TopBar from "@/frontend/components/TopBar";
-import OverallCard from "@/frontend/components/OverallCard";
-import { createClient } from "@/backend/lib/client";
+import TopBar from "@/components/layout/top-bar";
+import OverallCard from "@/components/sections/overall-card/overall-card";
+import { createClient } from "@/lib/supabase/client";
 import {
   BarChart3,
   ClipboardList,
@@ -26,7 +26,7 @@ import {
   type EventRecord,
   type PerformanceRecord,
   type PlayerRecord,
-} from "@/shared/lib/volleyball";
+} from "@/lib/volleyball";
 
 type PerformanceFormState = {
   passe_a: string;

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import TopBar from "@/frontend/components/TopBar";
+import TopBar from "@/components/layout/top-bar";
 import { RotateCw, ShieldAlert, Users } from "lucide-react";
-import { getFirstName, getInitials } from "@/shared/lib/volleyball";
+import { getFirstName, getInitials } from "@/lib/volleyball";
 
 type Player = {
   id: string;

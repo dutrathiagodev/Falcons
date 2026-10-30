@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { createClient } from "@/backend/lib/client";
-import TopBar from "@/frontend/components/TopBar";
+import { createClient } from "@/lib/supabase/client";
+import TopBar from "@/components/layout/top-bar";
 import {
   CalendarPlus,
   ChevronLeft,
@@ -27,7 +27,7 @@ import {
   getWinRate,
   isCompetitiveEvent,
   type EventRecord,
-} from "@/shared/lib/volleyball";
+} from "@/lib/volleyball";
 
 type EventFormState = {
   id?: string;

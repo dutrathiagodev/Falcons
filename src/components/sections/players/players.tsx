@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { createClient } from "@/backend/lib/client";
-import TopBar from "@/frontend/components/TopBar";
+import { createClient } from "@/lib/supabase/client";
+import TopBar from "@/components/layout/top-bar";
 import {
   BadgePlus,
   Pencil,
@@ -22,7 +22,7 @@ import {
   getStatusTone,
   groupPerformanceByPlayer,
   type PerformanceRecord,
-} from "@/shared/lib/volleyball";
+} from "@/lib/volleyball";
 
 type Player = {
   id: string;

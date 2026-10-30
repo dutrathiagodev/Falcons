@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { DM_Sans, Oswald } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
-import Sidebar from "@/frontend/components/Sidebar";
-import { SidebarProvider } from "@/frontend/components/SidebarContext";
-import { cn } from "@/backend/lib/utils";
+import Sidebar from "@/components/layout/sidebar";
+import { SidebarProvider } from "@/components/layout/sidebar-context";
+import { cn } from "@/lib/utils";
 
 const oswald = Oswald({
   variable: "--font-heading",
