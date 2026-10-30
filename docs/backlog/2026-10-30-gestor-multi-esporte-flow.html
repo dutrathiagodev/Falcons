@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fluxos do Gestor Multi-esporte</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--ink:#172033;--muted:#5d687d;--line:#d7deea;--accent:#315efb;--ok:#16794c;--warn:#9a6700;--bad:#b42318;--soft:#eef2ff;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);line-height:1.45}
+.page{max-width:1220px;margin:auto;padding:30px}
+.hero,.section{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px}
+.hero{background:linear-gradient(135deg,#fff,#edf1ff)}
+h1{margin:.1em 0;font-size:clamp(2rem,5vw,3.4rem)}h2{margin:0 0 14px}h3{margin:0 0 8px;font-size:1.05rem}
+.muted,small{color:var(--muted)}
+.chips,.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:#fff;font-size:.9rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.step,.card{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff}
+.step{border-top:4px solid var(--accent)}.step.decision{border-top-color:var(--warn)}.step.failure{border-top-color:var(--bad)}.step.success{border-top-color:var(--ok)}
+.num{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 6px;border-radius:999px;background:var(--soft);font-weight:800;margin-bottom:6px}
+.arrow{font-weight:700;color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:.95rem}th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f8f9fc}
+.table-wrap{overflow-x:auto}
+.callout{border-left:4px solid var(--accent);background:var(--soft);padding:12px 14px;border-radius:8px;margin:10px 0}
+.warn{border-left-color:var(--warn);background:#fff8db}.bad{border-left-color:var(--bad);background:#fff1f0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px}nav.toc a{color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:#fff;font-size:.9rem}
+nav.toc a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+details{border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:10px;background:#fff}
+summary{cursor:pointer;font-weight:700}
+.yes{color:var(--ok);font-weight:700}.no{color:var(--bad);font-weight:700}.part{color:var(--warn);font-weight:700}
+@media(max-width:760px){.page{padding:14px}.two{grid-template-columns:1fr}}
+@media print{body{background:#fff}.page{max-width:none}.hero,.section{break-inside:avoid}details{display:block}details>*{display:block}}
+</style>
+</head>
+<body><main class="page">
+
+<header class="hero">
+  <p class="muted">FALCONS / GESTOR MULTI-ESPORTE</p>
+  <h1>Fluxos de negócio</h1>
+  <p>Como usuários, times, esportes, atletas, jogos e estatísticas se comportam no gestor multi-esporte: quem faz o quê, o que é gravado e o que acontece quando dá errado.</p>
+  <div class="chips">
+    <span class="chip">Status: draft</span>
+    <span class="chip">Autoridade: fluxo proposto</span>
+    <span class="chip">Verificado: 2026-10-30 (develop a60cf73)</span>
+    <span class="chip">Plano: 2026-10-30-gestor-multi-esporte.md</span>
+  </div>
+  <nav class="toc" aria-label="Seções">
+    <a href="#escopo">Escopo</a><a href="#atores">Atores e papéis</a><a href="#permissoes">Permissões</a><a href="#principal">Fluxo principal</a><a href="#fluxos">Todos os fluxos</a><a href="#esporte">O que muda por esporte</a><a href="#falhas">Falhas</a><a href="#estados">Estados</a><a href="#cenarios">Cenários</a><a href="#decisao">Decisão</a>
+  </nav>
+</header>
+
+<section class="section" id="escopo">
+  <h2>Escopo e evidência</h2>
+  <div class="two">
+    <div class="card"><h3>Hoje (verificado)</h3><ul>
+      <li>Um único time de vôlei; não existe conceito de time nem de esporte.</li>
+      <li>Tabelas <code>jogadores_leilao</code>, <code>jogos</code>, <code>estatisticas_individuais</code> (colunas fixas de vôlei).</li>
+      <li>Qualquer usuário logado lê e escreve tudo, inclusive CPF.</li>
+      <li>Escrita via <code>/api/[resource]</code> com allowlist; leitura nas pages (servidor).</li>
+      <li>Regras de vôlei em <code>src/lib/volleyball.ts</code>.</li>
+    </ul></div>
+    <div class="card"><h3>Alvo</h3><ul>
+      <li>Organização com vários times; cada time tem um esporte.</li>
+      <li>O esporte define posições, escalação, placar, estatísticas e overall.</li>
+      <li>Acesso por papel e por time; dado pessoal só para admin.</li>
+      <li>Rápido (1 consulta por tela) e sem custo.</li>
+      <li><strong>Fora:</strong> pagamentos, push, scout ao vivo, campeonatos entre clubes.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="section" id="atores">
+  <h2>Atores, sistemas e legenda</h2>
+  <div class="grid">
+    <div class="card"><h3>Organização</h3><p><strong>owner</strong>: dono, gerencia tudo, inclusive papéis.<br><strong>admin</strong>: gerencia times, atletas e dados pessoais.</p></div>
+    <div class="card"><h3>Time</h3><p><strong>coach</strong>: elenco do time, agenda, escalação, placar, estatísticas, presença.<br><strong>scout</strong>: só placar e estatísticas.<br><strong>viewer</strong>: só leitura.</p></div>
+    <div class="card"><h3>Futuro</h3><p><strong>athlete</strong>: confirma presença e vê a própria estatística.<br><strong>guardian</strong>: responsável por menor.</p></div>
+    <div class="card"><h3>Sistemas</h3><p>Navegador → Next.js (Vercel gru1: pages RSC, API, proxy) → Supabase sa-east-1 (Postgres + RLS, Auth, Storage privado).</p></div>
+  </div>
+  <div class="legend">
+    <span class="chip">Borda azul: ação</span><span class="chip">Borda amarela: decisão</span><span class="chip">Borda vermelha: falha/recuperação</span><span class="chip">Borda verde: fim com sucesso</span>
+  </div>
+</section>
+
+<section class="section" id="permissoes">
+  <h2>Matriz de permissões</h2>
+  <p class="muted">Garantida pelo RLS no banco (funções <code>private.can_read_team</code>, <code>can_write_team</code>, <code>has_org_role</code>). A API repete a checagem só para devolver erro amigável.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Ação</th><th>owner</th><th>admin</th><th>coach (do time)</th><th>scout (do time)</th><th>viewer (do time)</th><th>membro de outro time</th></tr></thead>
+    <tbody>
+      <tr><td>Criar/arquivar time, escolher esporte</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Convidar e mudar papéis</td><td class="yes">sim</td><td class="part">só coach/scout/viewer</td><td class="no">não</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Cadastrar atleta na organização</td><td class="yes">sim</td><td class="yes">sim</td><td class="part">sim, já vinculando ao próprio time</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Ler dados pessoais (CPF, telefone, nascimento)</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Vincular atleta ao time (posição, camisa)</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Agenda (criar/editar/cancelar evento)</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Escalação</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Placar e estatísticas</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Presença</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Ver dashboard, elenco, agenda, estatísticas</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não (404)</td></tr>
+      <tr><td>Excluir atleta (LGPD)</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Ver auditoria</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="section" id="principal">
+  <h2>Fluxo principal: do login ao dashboard depois do jogo</h2>
+  <div class="grid">
+    <article class="step"><span class="num">1</span><h3>Login</h3><p>Usuário entra com e-mail e senha em <code>/login</code>. Cadastro público desligado: só quem foi convidado tem conta.</p><small>Escreve: cookie de sessão · Falha <span class="arrow">→ R1</span></small></article>
+    <article class="step decision"><span class="num">2</span><h3>Qual time?</h3><p>Cookie <code>last_team</code> existe e o usuário ainda é membro desse time?</p><small>Sim <span class="arrow">→ 4</span> · Não <span class="arrow">→ 3</span></small></article>
+    <article class="step"><span class="num">3</span><h3>Seletor de times</h3><p><code>/times</code> mostra só os times onde o usuário tem papel (RLS). Zero times → tela "peça um convite".</p><small>Lê: teams, team_staff, org_memberships</small></article>
+    <article class="step"><span class="num">4</span><h3>Dashboard do time</h3><p><code>/t/[time]</code> chama a RPC <code>team_dashboard</code> uma vez; o módulo do esporte escolhe os cards.</p><small>Lê: 1 RPC · Streaming com loading</small></article>
+    <article class="step"><span class="num">5</span><h3>Agendar jogo</h3><p>Coach cria evento <code>match</code> com data, adversário, local e tipo (campeonato/amistoso).</p><small>Escreve: events (status scheduled)</small></article>
+    <article class="step"><span class="num">6</span><h3>Escalação</h3><p>Coach escolhe formação do esporte e arrasta atletas para os slots. Salva tudo de uma vez.</p><small>Escreve: RPC save_lineup (transação) · Falha <span class="arrow">→ R4</span></small></article>
+    <article class="step"><span class="num">7</span><h3>Placar e estatísticas</h3><p>Coach ou scout lança o placar (sets, tempos ou quartos) e os números por atleta.</p><small>Escreve: RPC save_match_result + save_match_stats · Falha <span class="arrow">→ R5</span></small></article>
+    <article class="step success"><span class="num">8</span><h3>Dashboard atualizado</h3><p>Evento vira <code>done</code>; aproveitamento, saldo, líderes e overall recalculados na próxima leitura.</p><small>Verificação: valores batem com a soma de match_stats</small></article>
+  </div>
+</section>
+
+<section class="section" id="fluxos">
+  <h2>Todos os fluxos</h2>
+
+  <details open><summary>F2 · Criar time e escolher esporte (owner/admin)</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Formulário</h3><p>Nome, esporte (lista de <code>sports</code>), categoria (masculino/feminino/misto/sub-X), cor.</p></article>
+      <article class="step decision"><span class="num">2</span><h3>Validação</h3><p>Slug único na organização? Esporte existe?</p><small>Não <span class="arrow">→ 409 / 400</span></small></article>
+      <article class="step"><span class="num">3</span><h3>Gravação</h3><p>Insere <code>teams</code>; quem criou vira <code>coach</code> do time se não for admin.</p><small>Audit: team.created</small></article>
+      <article class="step success"><span class="num">4</span><h3>Time pronto</h3><p>Redireciona para <code>/t/[slug]/elenco</code> com módulo do esporte carregado.</p></article>
+    </div>
+    <div class="callout warn"><strong>Trocar esporte depois (F11):</strong> só permitido se o time não tiver jogos com placar, escalação ou estatística. Caso contrário 409 com mensagem "crie um novo time". Evita estatística de vôlei num time de futsal.</div>
+  </details>
+
+  <details><summary>F3 · Cadastrar atleta e vincular ao time</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Busca primeiro</h3><p>Antes de criar, busca por nome na organização para não duplicar (mesmo atleta no vôlei e no futsal).</p></article>
+      <article class="step decision"><span class="num">2</span><h3>Já existe?</h3><p>Sim <span class="arrow">→ 4</span> (só vincula) · Não <span class="arrow">→ 3</span></p></article>
+      <article class="step"><span class="num">3</span><h3>Criar atleta</h3><p>Dados públicos em <code>athletes</code>. Dados pessoais (opcionais) em <code>athlete_private</code>, só admin. Menor de idade exige consentimento do responsável antes de foto.</p><small>Audit: athlete.created</small></article>
+      <article class="step"><span class="num">4</span><h3>Vincular</h3><p>Posição da lista do esporte do time, número da camisa único entre ativos do time.</p><small>Falha: posição inválida <span class="arrow">→ 422</span> · camisa repetida <span class="arrow">→ 409</span></small></article>
+      <article class="step"><span class="num">5</span><h3>Foto (opcional)</h3><p>Navegador redimensiona para 512 px WebP; API envia para bucket privado <code>org/{org}/athletes/{id}.webp</code>.</p><small>Falha: tipo/tamanho <span class="arrow">→ 400</span></small></article>
+      <article class="step success"><span class="num">6</span><h3>No elenco</h3><p>Aparece no elenco do time e disponível para escalação.</p></article>
+    </div>
+  </details>
+
+  <details><summary>F4 · Agenda e F5 · Presença</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Criar evento</h3><p>Tipo: jogo, treino, reunião, outro. Jogo tem adversário e competição (campeonato/amistoso). Data e hora com fuso de São Paulo.</p></article>
+      <article class="step"><span class="num">2</span><h3>Presença</h3><p>Coach marca cada atleta: pendente, confirmado, ausente, talvez. No futuro o próprio atleta confirma.</p><small>Escreve: event_attendance (upsert por evento+atleta)</small></article>
+      <article class="step decision"><span class="num">3</span><h3>Cancelar?</h3><p>Evento cancelado mantém histórico e some dos próximos compromissos; jogo com placar não pode ser cancelado (só editado).</p></article>
+      <article class="step success"><span class="num">4</span><h3>Agenda</h3><p>Calendário mensal + lista "próximos" no dashboard.</p></article>
+    </div>
+  </details>
+
+  <details><summary>F6 · Escalação conforme o esporte</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Abrir jogo</h3><p><code>/t/[time]/jogos/[id]</code> aba Escalação. Carrega o componente de quadra/campo do esporte sob demanda.</p></article>
+      <article class="step"><span class="num">2</span><h3>Formação</h3><p>Vôlei: rotação P1–P6 + líbero. Futebol: 4-4-2, 2-2 (futsal)… Basquete: 5 posições. A formação define os slots.</p></article>
+      <article class="step decision"><span class="num">3</span><h3>Validação ao salvar</h3><p>Todos os slots obrigatórios preenchidos? Atletas são do time e estão ativos? Ninguém repetido? Limite de reservas do esporte?</p><small>Não <span class="arrow">→ 422 com a lista de problemas</span></small></article>
+      <article class="step success"><span class="num">4</span><h3>Salvo</h3><p>RPC <code>save_lineup</code> substitui os slots numa transação (nunca fica escalação pela metade).</p></article>
+    </div>
+  </details>
+
+  <details><summary>F7 · Placar e estatísticas</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Placar</h3><p>Vôlei: sets (25/15 pontos, 2 de diferença, melhor de 3 ou 5). Futebol/futsal/handebol: gols por tempo. Basquete: pontos por quarto e prorrogações.</p><small>Falha: regra do esporte <span class="arrow">→ 422</span></small></article>
+      <article class="step"><span class="num">2</span><h3>Estatísticas</h3><p>Formulário gerado pelas <code>stat_definitions</code> do esporte. Inteiros de 0 a 999. Basquete valida acertos ≤ tentativas.</p></article>
+      <article class="step decision"><span class="num">3</span><h3>Coerência</h3><p>Soma de gols dos atletas ≤ placar do time? (aviso, não bloqueio: pode haver gol contra).</p></article>
+      <article class="step success"><span class="num">4</span><h3>Gravado</h3><p>RPCs transacionais; evento vira <code>done</code>. Reenviar o mesmo formulário dá o mesmo resultado (idempotente).</p></article>
+    </div>
+  </details>
+
+  <details><summary>F8 · Dashboard e estatísticas</summary>
+    <p>Uma chamada <code>team_dashboard(team_id)</code> devolve: elenco por posição, disponibilidade, próximos 3 eventos, últimos 5 resultados, aproveitamento, saldo (sets, gols ou pontos), líderes por estatística-chave do esporte e overall médio. <code>athlete_season_stats</code> alimenta a página de estatísticas e o card do atleta. Tudo calculado no Postgres com índices; o navegador recebe só o resumo.</p>
+  </details>
+
+  <details><summary>F9 · Convite de comissão</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Convidar</h3><p>Admin informa e-mail, time (opcional) e papel. Gera token aleatório; guarda só o hash; expira em 7 dias.</p></article>
+      <article class="step"><span class="num">2</span><h3>Enviar link</h3><p>Fase 1: admin copia o link e manda (WhatsApp). Fase futura: e-mail automático (Supabase Auth invite).</p></article>
+      <article class="step decision"><span class="num">3</span><h3>Aceite</h3><p>Token válido, não usado, não expirado, e-mail igual ao da conta?</p><small>Não <span class="arrow">→ R6</span></small></article>
+      <article class="step success"><span class="num">4</span><h3>Membro</h3><p>RPC <code>accept_invitation</code> cria o vínculo e marca o convite como usado numa transação.</p><small>Audit: invitation.accepted</small></article>
+    </div>
+  </details>
+
+  <details><summary>F10 · Excluir atleta (LGPD)</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Pedido</h3><p>Admin abre o atleta e escolhe "Excluir definitivamente" com confirmação digitando o nome.</p></article>
+      <article class="step"><span class="num">2</span><h3>Apagar</h3><p>Remove foto do Storage, <code>athlete_private</code>, vínculos, presença, estatísticas e o atleta (cascade).</p></article>
+      <article class="step success"><span class="num">3</span><h3>Registro</h3><p><code>audit_events</code> guarda "athlete.erased" com quem e quando, sem nome nem dados pessoais.</p></article>
+    </div>
+    <div class="callout">Alternativa sem perder histórico: <strong>desligar</strong> o atleta (status inactive) mantém estatísticas para o time; exclusão é só para pedido de remoção de dados.</div>
+  </details>
+</section>
+
+<section class="section" id="esporte">
+  <h2>O que muda por esporte</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Ponto do site</th><th>Vôlei</th><th>Futsal · Fut7 · Campo</th><th>Basquete</th><th>Handebol</th></tr></thead>
+    <tbody>
+      <tr><td>Em quadra/campo</td><td>6 + líbero</td><td>5 · 7 · 11</td><td>5</td><td>7</td></tr>
+      <tr><td>Escalação</td><td>Rotação P1–P6 e líbero</td><td>Formação tática no campo</td><td>Cinco posições</td><td>Goleiro + 6</td></tr>
+      <tr><td>Placar</td><td>Sets</td><td>Gols por tempo</td><td>Pontos por quarto + prorrogação</td><td>Gols por tempo</td></tr>
+      <tr><td>Card "saldo"</td><td>Saldo de sets</td><td>Saldo de gols</td><td>Saldo de pontos</td><td>Saldo de gols</td></tr>
+      <tr><td>Líderes</td><td>Ataque, bloqueio, saque, passe A</td><td>Gols, assistências, defesas</td><td>Pontos, rebotes, assistências</td><td>Gols, defesas</td></tr>
+      <tr><td>Overall</td><td>Eficiência por fundamento (atual)</td><td>Gols, assistências, desarmes, defesas, cartões</td><td>Eficiência (PTS+REB+AST+STL+BLK − erros)</td><td>Gols, eficiência de arremesso, defesas</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="section" id="falhas">
+  <h2>Falhas, repetição e recuperação</h2>
+  <div class="grid">
+    <article class="step failure"><span class="num">R1</span><h3>Login inválido ou sessão expirada</h3><p>Mensagem genérica "e-mail ou senha inválidos". Sessão expirada em qualquer tela → proxy redireciona para <code>/login</code> e volta para a página depois.</p></article>
+    <article class="step failure"><span class="num">R2</span><h3>Time de outro usuário</h3><p>URL <code>/t/outro-time</code> ou ID de outro time na API → 404 (não revela que existe).</p></article>
+    <article class="step failure"><span class="num">R3</span><h3>Validação de formulário</h3><p>400 com o campo e a mensagem; nada é gravado; formulário mantém o que foi digitado.</p></article>
+    <article class="step failure"><span class="num">R4</span><h3>Escalação inválida</h3><p>422 com lista (slot vazio, atleta repetido, atleta inativo). Transação garante que a escalação anterior continua intacta.</p></article>
+    <article class="step failure"><span class="num">R5</span><h3>Placar fora da regra</h3><p>422 com explicação ("set de vôlei termina com 2 pontos de diferença"). Edição simultânea: última gravação vence; os PUT são idempotentes.</p></article>
+    <article class="step failure"><span class="num">R6</span><h3>Convite inválido</h3><p>Expirado, usado ou de outro e-mail → tela com "peça um novo convite"; nada é criado.</p></article>
+    <article class="step failure"><span class="num">R7</span><h3>Banco indisponível / lento</h3><p>Página mostra estado de erro com "tentar de novo"; API devolve 503 sem detalhes; log no servidor sem dados pessoais.</p></article>
+    <article class="step failure"><span class="num">R8</span><h3>Upload falhou</h3><p>Atleta é salvo sem foto; aviso para tentar de novo. Foto órfã é sobrescrita no próximo envio (mesmo caminho).</p></article>
+  </div>
+</section>
+
+<section class="section" id="estados">
+  <h2>Regras e transições de estado</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>Regra / transição</th><th>Onde é garantida</th><th>Evidência</th></tr></thead>
+    <tbody>
+      <tr><td>BR-01</td><td>Evento: <code>scheduled → done</code> (ao salvar placar) · <code>scheduled → canceled</code> · <code>done</code> não pode virar <code>canceled</code>.</td><td>RPC + CHECK</td><td>teste de RPC</td></tr>
+      <tr><td>BR-02</td><td>Time: <code>active → archived</code>; arquivado é só leitura e some do seletor.</td><td>RLS (write exige active)</td><td>teste negativo</td></tr>
+      <tr><td>BR-03</td><td>Esporte do time só muda sem jogos com dados (F11).</td><td>Trigger</td><td>teste 409</td></tr>
+      <tr><td>BR-04</td><td>Posição do vínculo pertence ao esporte do time.</td><td>FK composta (sport, position) + trigger</td><td>teste 422</td></tr>
+      <tr><td>BR-05</td><td>Estatística pertence ao esporte do time e o atleta é membro do time.</td><td>FK (sport, stat_key) + trigger</td><td>teste 422</td></tr>
+      <tr><td>BR-06</td><td>Camisa única entre membros ativos do time.</td><td>índice único parcial</td><td>teste 409</td></tr>
+      <tr><td>BR-07</td><td>Convite: <code>pending → accepted</code> · <code>pending → expired</code> · <code>pending → revoked</code>; uso único.</td><td>RPC</td><td>teste de RPC</td></tr>
+      <tr><td>BR-08</td><td>Atleta: <code>active ↔ injured ↔ inactive</code>; inativo não entra em escalação nova.</td><td>RPC save_lineup</td><td>teste 422</td></tr>
+      <tr><td>BR-09</td><td>Dados pessoais só para owner/admin; nunca aparecem em listas, logs ou URL.</td><td>RLS em athlete_private</td><td>teste negativo por papel</td></tr>
+      <tr><td>BR-10</td><td>Toda ação sensível gera <code>audit_events</code> sem dados pessoais.</td><td>Trigger/RPC</td><td>consulta de auditoria</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="section">
+  <h2>Dados, fronteiras de confiança e operação</h2>
+  <div class="grid">
+    <div class="card"><h3>Gravado</h3><p>teams, athletes, athlete_private, team_members, events, match_results, lineups, lineup_slots, match_stats, event_attendance, invitations, audit_events.</p></div>
+    <div class="card"><h3>Fronteiras</h3><p>Navegador não fala com o banco. API: Origin + sessão + validação de esporte. Banco: RLS por papel. Storage privado com URL assinada.</p></div>
+    <div class="card"><h3>Operação</h3><p>Logs da Vercel sem dados pessoais; auditoria consultável por admin; Speed Insights para tempo de carregamento; CI bloqueia merge com teste quebrado.</p></div>
+  </div>
+</section>
+
+<section class="section" id="cenarios">
+  <h2>Cenários</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Cenário</th><th>Condição</th><th>Estado esperado</th><th>O que o usuário vê</th></tr></thead>
+    <tbody>
+      <tr><td>Caminho feliz vôlei</td><td>Coach agenda, escala, lança 3×1 e estatísticas</td><td>Evento done, stats gravadas</td><td>Dashboard com vitória e líderes</td></tr>
+      <tr><td>Caminho feliz futsal</td><td>Mesmo atleta do vôlei vinculado ao futsal</td><td>Um atleta, dois vínculos</td><td>Atleta nos dois elencos, estatísticas separadas</td></tr>
+      <tr><td>Coach de outro time</td><td>Abre /t/futsal sendo coach só do vôlei</td><td>Nada lido</td><td>Página 404</td></tr>
+      <tr><td>Viewer tenta lançar estatística</td><td>PUT /api/events/:id/stats</td><td>Nada gravado</td><td>404 (sem permissão de escrita)</td></tr>
+      <tr><td>Coach tenta ver CPF</td><td>Lê athlete_private</td><td>RLS retorna 0 linhas</td><td>Campo não aparece</td></tr>
+      <tr><td>Set inválido</td><td>Vôlei 25×24</td><td>Nada gravado</td><td>422 "diferença mínima de 2 pontos"</td></tr>
+      <tr><td>Estatística de outro esporte</td><td>Chave <code>rebounds_def</code> em time de vôlei</td><td>Nada gravado</td><td>422 "estatística não existe neste esporte"</td></tr>
+      <tr><td>Camisa repetida</td><td>Dois ativos com 10</td><td>Nada gravado</td><td>409 "camisa 10 já usada"</td></tr>
+      <tr><td>Trocar esporte com dados</td><td>Vôlei com jogos → futsal</td><td>Inalterado</td><td>409 "crie um novo time"</td></tr>
+      <tr><td>Convite expirado</td><td>Token de 8 dias</td><td>Inalterado</td><td>"Peça um novo convite"</td></tr>
+      <tr><td>Exclusão LGPD</td><td>Admin exclui atleta</td><td>Dados e foto apagados</td><td>Atleta some; auditoria registra</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="section" id="decisao">
+  <h2>Decisão e próximo artefato</h2>
+  <div class="callout"><strong>Recomendado:</strong> organização → times → esporte como módulo de código com tabelas de referência no banco; RLS por papel como barreira real; uma RPC por tela; migração expand/backfill/contract preservando os dados do Falcons.</div>
+  <p><strong>Reaproveitado:</strong> login e proxy, API com allowlist e checagem de origem, testes e CI, regras de vôlei (viram o primeiro módulo), layout e componentes atuais até os mockups novos.</p>
+  <p><strong>Não muda:</strong> stack, hospedagem, custo zero, padrão "leitura no servidor, escrita pela API".</p>
+  <p><strong>Decisões em aberto (dono: Thiago):</strong> Q1–Q8 no plano Markdown (atleta em vários times, login de atleta, vender para outros clubes, ordem dos esportes, CPF, scout ao vivo, categorias, direção visual).</p>
+  <p><strong>Próximo:</strong> esquema de banco e API (<code>2026-10-30-gestor-multi-esporte-scheme.html</code>) e, antes da UI, mockups por tela.</p>
+</section>
+
+</main></body></html>
