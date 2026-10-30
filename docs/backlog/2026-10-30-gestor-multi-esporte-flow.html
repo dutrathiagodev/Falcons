@@ -192,6 +192,63 @@ summary{cursor:pointer;font-weight:700}
   </details>
 </section>
 
+<section class="section" id="rodada2">
+  <h2>Rodada 2: ao vivo, conta do atleta, OVR e escalação</h2>
+
+  <details open><summary>F12 · Jogo ao vivo (coach/scout registram, time e atletas assistem)</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Abrir modo ao vivo</h3><p>No jogo agendado, "Iniciar ao vivo". Carrega a escalação salva (ou pede uma) e marca <code>stats_mode = live</code>. Tela cheia, botões grandes, funciona no celular.</p><small>Escreve: events.status = live</small></article>
+      <article class="step"><span class="num">2</span><h3>Registrar lance</h3><p>Toca no atleta e na ação do esporte: vôlei (ponto de ataque, ace, bloqueio, erro, passe A/B/C), futebol (gol, assistência, finalização, falta, cartão, defesa), basquete (cesta de 2/3, lance livre, rebote, roubo, toco, erro).</p><small>Aparece na hora (otimista) · vai para fila local</small></article>
+      <article class="step decision"><span class="num">3</span><h3>Internet ok?</h3><p>Sim: fila envia em lote a cada 1–2 s. Não: lances ficam no aparelho e são reenviados quando voltar; cada lance tem id único, então nada duplica.</p><small>Indicador "sincronizado / X pendentes"</small></article>
+      <article class="step"><span class="num">4</span><h3>Placar automático</h3><p>Ações que pontuam atualizam o placar pelas regras do módulo: vôlei fecha set em 25 (15 no tie-break) com 2 de diferença e gira a rotação quando o time recupera o saque; futebol soma gols; basquete soma 1/2/3 por quarto.</p></article>
+      <article class="step"><span class="num">5</span><h3>Substituição, tempo, período</h3><p>Troca de atleta (respeita limite do esporte), pedido de tempo, fim de set/tempo/quarto. Ponto do adversário também é registrado (sem atleta).</p></article>
+      <article class="step failure"><span class="num">6</span><h3>Errou?</h3><p>"Desfazer" remove o último lance (marcado como anulado, não apagado). Correção de qualquer lance pela lista do jogo.</p></article>
+      <article class="step"><span class="num">7</span><h3>Quem assiste</h3><p>Membros do time e atletas veem placar e lances em tempo real (Supabase Realtime, canal privado do jogo). Sem permissão, não conecta.</p></article>
+      <article class="step success"><span class="num">8</span><h3>Encerrar</h3><p>RPC <code>close_match</code>: confirma placar final, gera estatísticas por atleta a partir dos lances, grava retrato do OVR e marca <code>done</code>. Reabrir é possível para correção (recalcula tudo).</p></article>
+    </div>
+  </details>
+
+  <details><summary>F13 · Conta do atleta, com esportes separados</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Convite</h3><p>Admin ou coach abre o atleta e clica "Convidar para o app". O convite fica ligado a esse cadastro (não cria pessoa nova).</p></article>
+      <article class="step"><span class="num">2</span><h3>Aceite</h3><p>Atleta abre o link, cria senha; <code>athletes.user_id</code> passa a apontar para a conta. Uma conta por pessoa, para todos os esportes.</p></article>
+      <article class="step"><span class="num">3</span><h3>Meu perfil</h3><p><code>/meu</code> mostra uma aba por perfil esportivo: "Vôlei · Falcons Vôlei · Ponteiro #7" e "Futsal · Falcons Futsal · Ala #10". Cada aba tem a própria estatística, OVR, evolução, agenda e presença.</p></article>
+      <article class="step decision"><span class="num">4</span><h3>O que o atleta pode</h3><p>Ver só os próprios dados e o elenco/agenda dos seus times; confirmar presença; assistir ao vivo. Não vê CPF de ninguém, nem estatística individual de outros (só ranking, se o time permitir).</p></article>
+      <article class="step success"><span class="num">5</span><h3>Separação garantida</h3><p>Estatísticas e OVR são guardados por <strong>time</strong> (que tem um esporte). Um gol no futsal nunca soma no vôlei, porque a chave da estatística pertence ao esporte.</p></article>
+    </div>
+  </details>
+
+  <details><summary>F14 · Pontuação OVR por esporte</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Atributos do esporte</h3><p>Vôlei: ATQ PAS SAQ TOQ BLQ NOC PUL (igual hoje). Futebol: FIN PAS DRI DEF FIS (+ GOL para goleiro). Basquete: ARR 3PT REB AST DEF FIS. Handebol: ARR ASS DEF FIS (+ GOL).</p></article>
+      <article class="step"><span class="num">2</span><h3>Cálculo</h3><p>Base pela posição + desempenho acumulado (módulo do esporte), limitado a 40–99. "Forma" = média dos últimos 5 jogos comparada à temporada.</p></article>
+      <article class="step"><span class="num">3</span><h3>Retrato por jogo</h3><p>Ao encerrar o jogo, grava <code>rating_snapshots</code> → gráfico de evolução e ranking do time.</p></article>
+      <article class="step decision"><span class="num">4</span><h3>Ajuste do treinador</h3><p>Coach pode somar de −5 a +5 com motivo; fica registrado na auditoria e aparece no card como "ajuste".</p></article>
+    </div>
+  </details>
+
+  <details><summary>F6 / F15 · Escalação bonita por esporte, salva</summary>
+    <div class="grid">
+      <article class="step"><span class="num">1</span><h3>Desenho</h3><p>Vôlei: quadra atual (P1–P6 + líbero) com as 6 rotações calculadas a partir da inicial. Futebol: campo com a formação (4-4-2, 2-2…). Basquete e handebol: quadra com as posições.</p></article>
+      <article class="step"><span class="num">2</span><h3>Por posição</h3><p>Cada slot mostra foto, número e cor da posição; alerta quando o atleta está fora da posição dele (ex.: líbero na rede, goleiro na linha). Arrastar e soltar ou clicar; funciona com teclado.</p></article>
+      <article class="step"><span class="num">3</span><h3>Salvar</h3><p>Salva no jogo e, opcionalmente, como <strong>escalação modelo</strong> do time; num jogo novo, "usar modelo" preenche tudo.</p></article>
+      <article class="step success"><span class="num">4</span><h3>Integra com o ao vivo</h3><p>O modo ao vivo começa com essa escalação e acompanha substituições e rotações.</p></article>
+    </div>
+  </details>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Permissão nova</th><th>owner/admin</th><th>coach</th><th>scout</th><th>viewer</th><th>atleta</th></tr></thead>
+    <tbody>
+      <tr><td>Registrar lances ao vivo</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Assistir ao vivo</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="yes">sim</td><td class="part">só times dele</td></tr>
+      <tr><td>Convidar atleta para o app</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Ver estatística individual</td><td class="yes">todas</td><td class="yes">do time</td><td class="yes">do time</td><td class="yes">do time</td><td class="part">só a própria</td></tr>
+      <tr><td>Ajustar OVR (±5)</td><td class="yes">sim</td><td class="yes">sim</td><td class="no">não</td><td class="no">não</td><td class="no">não</td></tr>
+      <tr><td>Confirmar presença</td><td class="yes">qualquer</td><td class="yes">do time</td><td class="no">não</td><td class="no">não</td><td class="part">só a própria</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
 <section class="section" id="esporte">
   <h2>O que muda por esporte</h2>
   <div class="table-wrap"><table>

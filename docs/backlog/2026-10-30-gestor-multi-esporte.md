@@ -31,10 +31,16 @@ Abra os `.html` direto no navegador (duplo clique). Não precisam de servidor.
 
 **Requisitos não funcionais (do Thiago):** 100% seguro (sem vazamento de dados), sem gerar gastos, rápido e fluido, banco "redondinho", código limpo, arquitetura pensada como software profissional.
 
+**Pedidos do Thiago incorporados (rodada 2):**
+- manter e levar para todos os esportes a **pontuação do atleta (card OVR)**;
+- **escalação bonita por posição** em cada esporte, salva de verdade;
+- **conta de usuário para atleta**, com a mesma pessoa podendo jogar vôlei e futsal **com tudo separado por esporte**;
+- **marcar ao vivo** o que acontece no jogo.
+
 **Fora de escopo agora:**
 - pagamentos/mensalidade e notificações push (fase futura, listadas em §12);
-- app mobile nativo (o site é responsivo e pode virar PWA);
-- scout ao vivo lance a lance (decidido: estatística agregada por jogo — ver D6);
+- app mobile nativo (o site é responsivo e pode virar PWA, inclusive para o modo ao vivo);
+- vídeo e análise de vídeo;
 - campeonatos/tabelas entre times de organizações diferentes.
 
 ## 2. Estado atual verificado
@@ -49,6 +55,9 @@ Abra os `.html` direto no navegador (duplo clique). Não precisam de servidor.
 | Banco | 3 tabelas sem conceito de time/esporte: `jogadores_leilao`, `jogos`, `estatisticas_individuais` (uma coluna por fundamento de vôlei: `passe_a`, `saque_ace`…) | `supabase/migrations/*` |
 | RLS | qualquer usuário autenticado lê/escreve tudo (`FOR ALL TO authenticated`) | `20261030120000_lock_down_rls.sql` |
 | Fotos | bucket **público** `fotos-jogadores` | idem |
+| Pontuação (OVR) | Card estilo FIFA: nota 40–99, 7 atributos de vôlei (ATQ, PAS, SAQ, TOQ, BLQ, NOC, PUL), base por posição + ajuste pelo desempenho, indicador de "forma" | `src/components/sections/overall-card/overall-card.tsx`, `getPlayerRatings` em `src/lib/volleyball.ts` |
+| Escalação | Quadra de vôlei P1–P6, 6 rotações, banco, clique para posicionar. **Não salva**: some ao recarregar | `src/components/sections/lineup/lineup.tsx` |
+| Ao vivo | não existe; estatística é lançada depois do jogo, por atleta | `src/components/sections/statistics/statistics.tsx` |
 | Infra | Vercel (função em `iad1`; PR 009 muda para `gru1`), Supabase em `sa-east-1` | `vercel.json` |
 
 **Limitações que este plano resolve:** não existe time nem esporte; estatística em colunas fixas não serve para outros esportes; qualquer usuário logado vê dados de todos (inclusive CPF); fotos de atletas (possivelmente menores) ficam públicas por URL; o nome `jogadores_leilao` é herança de outro projeto.
@@ -60,12 +69,12 @@ Decisões marcadas **(confirmar)** são padrões propostos; mudam o desenho se a
 | ID | Decisão | Alternativa rejeitada e por quê |
 |---|---|---|
 | D1 | **Hierarquia:** Organização → Times → (Elenco, Agenda, Jogos). Esquema já multi-organização; a UI começa com uma organização só. **(confirmar)** | Só times soltos: impede dar acesso por clube e vender depois. |
-| D2 | **Atleta pertence à organização** e entra em vários times via `team_members` (ex.: mesma pessoa no vôlei e no futsal). **(confirmar)** | Atleta por time: duplica cadastro e dados pessoais. |
+| D2 | **Uma pessoa = um atleta** na organização. Cada vínculo com um time (`team_members`) é o **perfil esportivo** daquela pessoa naquele esporte: posição, camisa, atributos do esporte (pé dominante no futebol, mão no vôlei/basquete), estatísticas, OVR e histórico. Vôlei e futsal nunca se misturam. | Um cadastro por esporte: duplica dados pessoais e a pessoa teria dois logins. Tudo num perfil só: misturaria posição e estatística de esportes diferentes. |
 | D3 | **Dados sensíveis separados** em `athlete_private` (CPF, telefone, nascimento, responsável). Só admin da organização lê. Recomendação: **não coletar CPF** se não houver uso real. **(confirmar)** | Tudo na mesma tabela: qualquer leitura de elenco vazaria CPF. |
 | D4 | **Esporte = módulo de código** (`src/sports/<esporte>`) que declara posições, formações, placar, estatísticas e overall. O banco tem as tabelas de referência (`sports`, `sport_positions`, `stat_definitions`) **geradas a partir do código** por script; um teste garante que estão sincronizadas. | Configuração só no banco (JSON): sem tipagem, sem testes, regras de validação ficariam espalhadas. Só no código: o banco não conseguiria validar com FK. |
 | D5 | **Estatística em linhas** (`match_stats`: jogo, atleta, chave da estatística, valor) com FK para `stat_definitions`. | Uma coluna por fundamento (atual): exige migration por esporte e deixa colunas vazias. JSONB livre: sem integridade nem índice. |
-| D6 | **Estatística agregada por jogo** (contagem por atleta), não lance a lance. Tabela de eventos ao vivo fica para fase futura. **(confirmar)** | Lance a lance agora: muito mais escrita, UI complexa, sem necessidade comprovada. |
-| D7 | **Papéis:** organização (`owner`, `admin`) e time (`coach`, `scout`, `viewer`). Atleta com login fica para fase futura. **(confirmar)** | Todos iguais (atual): sem controle de quem vê dado pessoal. |
+| D6 | **Jogo ao vivo** com registro lance a lance (`match_live_events`): cada toque em "ponto de ataque", "gol", "cesta de 3", substituição etc. vira um evento com sequência, período e atleta. Placar e estatísticas são **calculados a partir dos lances**. Também existe o **modo manual** (lançar números depois do jogo); cada jogo usa um modo (`stats_mode`), para não contar duas vezes. | Só agregado (versão anterior deste plano): o Thiago pediu ao vivo. Só ao vivo: impede corrigir ou lançar jogo antigo. |
+| D7 | **Papéis:** organização (`owner`, `admin`), time (`coach`, `scout`, `viewer`) e **`athlete`** (pessoa com login ligada ao seu cadastro de atleta). O atleta vê só o próprio perfil, estatística e OVR **por esporte**, confirma presença e acompanha jogos ao vivo dos seus times. Responsável (`guardian`) fica para fase futura. | Todos iguais (atual): sem controle de quem vê dado pessoal. Atleta sem login: atleta não acompanha a própria evolução. |
 | D8 | **RLS é a barreira real.** Funções `private.can_read_team()` / `can_write_team()` / `has_org_role()` (`SECURITY DEFINER`, `search_path` vazio) usadas em todas as policies. A API valida regras de esporte e formato; o banco garante quem pode o quê. | Autorização só na API: um bug na API vazaria dados. |
 | D9 | **Leitura no servidor (RSC) com a sessão do usuário; escrita pela API** (`/api/...`), como hoje. Escritas compostas (escalação, estatísticas, placar) passam por **RPC transacional** no Postgres. | Cliente falando direto com o Supabase: amplia superfície de ataque. |
 | D10 | **Rotas por time:** `/t/[teamSlug]/...`. Seletor de time na entrada e troca rápida na sidebar. O componente de quadra/campo do esporte é carregado sob demanda (`next/dynamic`). | Query string `?team=`: URL frágil, cache pior. |
@@ -73,6 +82,10 @@ Decisões marcadas **(confirmar)** são padrões propostos; mudam o desenho se a
 | D12 | **Custo zero:** Vercel Hobby + Supabase Free, região `gru1` + `sa-east-1`, sem serviços pagos. Keep-alive diário via GitHub Actions para o Supabase grátis não pausar. | Serviços pagos (Redis, filas, CDN de imagem): desnecessários no volume atual. |
 | D13 | **Migração expand → backfill → contract:** tabelas novas convivem com as antigas, dados do Falcons são copiados para o time "Falcons Vôlei", app troca, tabelas antigas são removidas depois de um período de verificação. | Migração destrutiva de uma vez: sem rollback. |
 | D14 | **Nomes em inglês no banco e no código** (`athletes`, `teams`, `events`), textos da UI em português. | Misturar (`jogadores_leilao`): confuso e herdado de outro projeto. |
+| D15 | **Pontuação OVR por esporte:** o card atual vira genérico; cada módulo de esporte define os atributos (vôlei: ATQ PAS SAQ TOQ BLQ NOC PUL; futebol: FIN PAS DRI DEF FIS + GOL para goleiro; basquete: ARR 3PT REB AST DEF FIS; handebol: ARR ASS DEF FIS + GOL). Nota 40–99 = base por posição + desempenho. Depois de cada jogo fechado grava-se um **retrato da nota** (`rating_snapshots`) para mostrar evolução e "forma" (últimos 5 jogos). Rankings por time. | Calcular só na hora: sem histórico nem gráfico de evolução. Nota manual: subjetiva; pode existir como **ajuste do treinador** (±5) registrado e auditado. |
+| D16 | **Escalação salva e desenhada por esporte:** quadra de vôlei (rotações P1–P6 + líbero, **mantém o desenho atual**), campo de futebol com formação (slots posicionados por coordenadas), quadra de basquete e de handebol. Slot colorido pela posição, alerta de posição trocada (ex.: líbero na rede), arrastar e soltar + clique (acessível por teclado). Salva por jogo e como **modelo do time** (escalação padrão reutilizável). No vôlei as 6 rotações são calculadas a partir da inicial. | Escalação só na tela (atual): perde ao recarregar. Uma tela genérica para todos: não fica bonita nem útil por esporte. |
+| D17 | **Ao vivo em tempo real e à prova de internet ruim:** a tela ao vivo grava o lance na hora na tela (otimista), guarda numa fila local (IndexedDB) e envia em lote com id único por lance (sem duplicar se reenviar). Quem está assistindo vê o placar atualizar via **Supabase Realtime** em canal privado (respeita permissões). Desfazer último lance. Ao encerrar, uma RPC fecha o jogo: placar final, estatísticas, OVR. | Atualizar a página para ver: não é "ao vivo". Gravar direto sem fila: em ginásio com Wi-Fi ruim perde lance. |
+| D18 | **Conta do atleta por convite:** o admin/coach gera convite ligado ao cadastro do atleta; ao aceitar, `athletes.user_id` é preenchido. Uma conta para todos os esportes; dentro dela o atleta troca de esporte/time como a comissão. | Atleta criando conta sozinho: abre cadastro público (risco). |
 
 ## 4. Esportes suportados (módulos)
 
@@ -107,18 +120,22 @@ Fluxo completo com decisões, falhas e permissões no [flow HTML](2026-10-30-ges
 | F9 | Convidar membro da comissão | owner/admin | convite com token, expira em 7 dias |
 | F10 | Excluir atleta / pedido LGPD | admin | dados e fotos apagados, evento de auditoria |
 | F11 | Trocar esporte de um time | admin | só se o time não tiver jogos/estatísticas; senão 409 |
+| F12 | **Jogo ao vivo**: abrir modo ao vivo, tocar no atleta + ação, placar se atualiza, substituições, rotação do vôlei, desfazer, encerrar | coach, scout (registram) · todos do time e atletas (assistem) | lances gravados, placar e estatísticas calculados, OVR atualizado ao encerrar |
+| F13 | **Conta do atleta**: convite ligado ao cadastro → atleta cria senha → vê "Meu perfil" com abas por esporte (vôlei, futsal…) | admin/coach (convida), atleta | atleta vê só os próprios dados, separados por esporte |
+| F14 | **Pontuação OVR**: card por esporte, evolução jogo a jogo, ranking do time, ajuste do treinador (±5, auditado) | todos do time; ajuste só coach | retrato da nota por jogo |
+| F15 | **Escalação modelo**: salvar a escalação padrão do time e aplicar num jogo com um clique | coach | escalação do jogo preenchida |
 
 ## 6. Dados e API (resumo)
 
 Contrato completo (colunas, constraints, índices, policies, RPCs, requests/responses, erros) no [scheme HTML](2026-10-30-gestor-multi-esporte-scheme.html).
 
-**Tabelas novas:** `organizations`, `org_memberships`, `teams`, `team_staff`, `sports`, `sport_positions`, `stat_definitions`, `athletes`, `athlete_private`, `team_members`, `events`, `match_results`, `lineups`, `lineup_slots`, `match_stats`, `event_attendance`, `invitations`, `audit_events`.
+**Tabelas novas:** `organizations`, `org_memberships`, `teams`, `team_staff`, `sports`, `sport_positions`, `stat_definitions`, `live_actions`, `athletes` (com `user_id` para o login do atleta), `athlete_private`, `team_members` (perfil esportivo, com `sport_attributes`), `events` (com `stats_mode`), `match_results`, `lineups` (por jogo ou modelo do time), `lineup_slots`, `match_live_events`, `match_stats`, `rating_snapshots`, `event_attendance`, `invitations`, `audit_events`.
 
 **Removidas no fim (contract):** `jogadores_leilao`, `jogos`, `estatisticas_individuais`.
 
-**RPCs:** `team_dashboard(team_id)`, `athlete_season_stats(team_id, athlete_id)`, `save_lineup(...)`, `save_match_stats(...)`, `save_match_result(...)`, `accept_invitation(token)`.
+**RPCs:** `team_dashboard(team_id)`, `athlete_season_stats(team_id, athlete_id)`, `athlete_profile(athlete_id)` (abas por esporte), `save_lineup(...)`, `save_match_stats(...)`, `save_match_result(...)`, `record_live_events(...)`, `undo_live_event(...)`, `close_match(event_id)` (placar + estatísticas + OVR), `accept_invitation(token)`.
 
-**API (Next.js Route Handlers):** rotas por recurso com escopo de time — `/api/teams`, `/api/teams/:teamId/members`, `/api/teams/:teamId/events`, `/api/events/:id/{result,lineup,stats,attendance}`, `/api/athletes`, `/api/athletes/:id/private`, `/api/photos`, `/api/invitations`, `/api/auth/*`. A API genérica atual (`/api/[resource]`) é substituída.
+**API (Next.js Route Handlers):** rotas por recurso com escopo de time — `/api/teams`, `/api/teams/:teamId/members`, `/api/teams/:teamId/events`, `/api/teams/:teamId/lineup-templates`, `/api/events/:id/{result,lineup,stats,attendance,live,close}`, `/api/athletes`, `/api/athletes/:id/{private,rating-adjustment}`, `/api/me/attendance/:eventId` (atleta), `/api/photos`, `/api/invitations`, `/api/auth/*`. A API genérica atual (`/api/[resource]`) é substituída. Tempo real (placar ao vivo para quem assiste) via Supabase Realtime em canal privado por jogo.
 
 **Erros padronizados:** 400 validação · 401 sem sessão · 403 origem inválida · 404 não existe **ou sem permissão** (não revela que o recurso existe) · 409 conflito (camisa repetida, troca de esporte com dados) · 422 regra do esporte (ex.: set de vôlei 25×24).
 
@@ -131,7 +148,11 @@ Contrato completo (colunas, constraints, índices, policies, RPCs, requests/resp
 /t/[time]               dashboard do time (muda por esporte)
 /t/[time]/elenco        atletas do time, posição e camisa
 /t/[time]/agenda        calendário: jogos, treinos, reuniões
-/t/[time]/jogos/[id]    abas: resumo · escalação · estatísticas · presença
+/t/[time]/jogos/[id]    abas: resumo · escalação · ao vivo · estatísticas · presença
+/t/[time]/jogos/[id]/ao-vivo   tela cheia, botões grandes, funciona com internet ruim
+/t/[time]/escalacao     escalação modelo do time (desenho do esporte)
+/t/[time]/ranking       cards OVR e evolução
+/meu                    portal do atleta: perfil, abas por esporte, presença, jogos ao vivo
 /t/[time]/estatisticas  rankings e evolução por atleta
 /t/[time]/ajustes       nome, categoria, comissão do time
 /org/atletas            cadastro geral de atletas (dados pessoais só para admin)
@@ -188,9 +209,12 @@ Cada fase termina com lint, testes e build verdes e vira **um PR numerado** cont
 | F6 | **Família futebol**: futsal, fut7/society, campo (formações, campo SVG, estatísticas) | `src/sports/football/**` | criar time de futsal, escalar, registrar jogo e ver dashboard |
 | F7 | **Basquete e handebol** | `src/sports/basketball/**`, `src/sports/handball/**` | idem |
 | F8 | **Presença, convites, papéis na UI, auditoria visível para admin** | `src/app/org/**` | coach convidado só vê o próprio time |
-| F9 | **Contract**: remover tabelas antigas, API genérica e `src/lib/volleyball.ts`; fechar docs | migrations, `docs/architecture/*` | nada referencia tabelas antigas; docs atualizados |
+| F9 | **Conta do atleta** (convite, `/meu`, abas por esporte, presença) | `src/app/meu/**` | atleta de vôlei e futsal vê os dois perfis separados e nada de outros atletas |
+| F10 | **Jogo ao vivo** (lances, fila offline, Realtime, desfazer, encerrar) — vôlei primeiro, depois futebol e basquete | `src/app/t/[time]/jogos/[id]/ao-vivo/**`, `src/sports/*/live.ts` | jogo de teste inteiro registrado com Wi-Fi caindo, placar igual ao real |
+| F11 | **OVR multi-esporte** (card genérico, retratos por jogo, ranking, ajuste do treinador) | `src/components/rating-card/**`, `src/sports/*/rating.ts` | notas do vôlei iguais às de hoje; futsal e basquete com testes |
+| F12 | **Contract**: remover tabelas antigas, API genérica e `src/lib/volleyball.ts`; fechar docs | migrations, `docs/architecture/*` | nada referencia tabelas antigas; docs atualizados |
 
-Dependências: F1 → F2 → F3 → F4 → F5 → (F6, F7 em paralelo) → F8 → F9. Mockups (gate de F5) podem ser feitos em paralelo a F1–F4.
+Dependências: F1 → F2 → F3 → F4 → F5 → (F6, F7 em paralelo) → F8 → (F9, F10, F11 em paralelo) → F12. Mockups (gate de F5) podem ser feitos em paralelo a F1–F4. A escalação salva (D16) entra já na F5 para o vôlei.
 
 ## 11. Migração, compatibilidade e rollback
 
@@ -217,12 +241,14 @@ Toda migration é aplicada no Supabase **pelo Thiago**; este plano não autoriza
 
 | # | Pergunta | Padrão proposto | Dono |
 |---|---|---|---|
-| Q1 | Um atleta pode estar em mais de um time/esporte? | sim (D2) | Thiago |
-| Q2 | Atletas e responsáveis vão ter login? | não agora; fase futura (D7) | Thiago |
+| Q1 | Um atleta pode estar em mais de um time/esporte? | **respondido: sim**, com tudo separado por esporte (D2) | Thiago |
+| Q2 | Atletas e responsáveis vão ter login? | **respondido: atleta sim** (D7, D18); responsável fica para depois | Thiago |
 | Q3 | Vai vender para outros clubes? | esquema pronto, UI com uma organização (D1); revisar custo Vercel se for comercial | Thiago |
 | Q4 | Ordem dos esportes | vôlei (paridade) → futsal → society/fut7 → campo → basquete → handebol | Thiago |
 | Q5 | Precisa mesmo de CPF? | recomendo não coletar (D3) | Thiago |
-| Q6 | Estatística agregada ou lance a lance? | agregada (D6) | Thiago |
+| Q6 | Estatística agregada ou lance a lance? | **respondido: ao vivo lance a lance**, com modo manual opcional (D6, D17) | Thiago |
+| Q9 | Quem pode assistir ao vivo? | só membros do time e atletas; página pública fica para depois | Thiago |
+| Q10 | Ajuste manual do treinador no OVR (±5)? | permitido e auditado (D15) | Thiago |
 | Q7 | Categorias (masculino/feminino/misto, sub-17…) | campo `category` no time | Thiago |
 | Q8 | Direção visual do novo layout | mockups na F5 | Thiago |
 

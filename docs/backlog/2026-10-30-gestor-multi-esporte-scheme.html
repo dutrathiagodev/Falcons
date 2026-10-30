@@ -131,7 +131,27 @@ a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
       <tr><td>event_id</td><td>uuid FK ON DELETE CASCADE</td></tr><tr><td>athlete_id</td><td>uuid FK ON DELETE CASCADE</td></tr><tr><td>status</td><td>text CHECK in ('pending','yes','no','maybe')</td></tr><tr><td>updated_at / updated_by</td><td>timestamptz / uuid</td></tr><tr><td colspan="2">PK (event_id, athlete_id)</td></tr></table></article>
 
-    <article class="entity"><span class="badge drop">DROP (F9)</span><h3><code>jogadores_leilao</code>, <code>jogos</code>, <code>estatisticas_individuais</code></h3><p class="muted">Ficam intactas até o contract. Leitura só para backfill e rollback.</p></article>
+    <article class="entity"><span class="badge new">NEW</span><h3><code>match_live_events</code></h3><p class="muted">Lances do jogo ao vivo (fonte da verdade quando <code>events.stats_mode = 'live'</code>).</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>uuid PK · <strong>gerado no aparelho</strong> (idempotência: reenviar não duplica)</td></tr><tr><td>event_id</td><td>uuid FK → events ON DELETE CASCADE</td></tr><tr><td>seq</td><td>integer (ordem no jogo) · UNIQUE (event_id, seq)</td></tr><tr><td>period</td><td>smallint (set, tempo ou quarto)</td></tr><tr><td>clock_ms</td><td>integer null (cronômetro do jogo, quando o esporte usa)</td></tr><tr><td>side</td><td>text CHECK in ('us','them')</td></tr><tr><td>athlete_id</td><td>uuid FK null (null em ponto do adversário)</td></tr><tr><td>sport / action_key</td><td>text · FK (sport, action_key) → live_actions</td></tr><tr><td>payload</td><td>jsonb pequeno (ex.: sai/entra na substituição)</td></tr><tr><td>voided_at / voided_by</td><td>desfazer marca, não apaga</td></tr><tr><td>recorded_at / recorded_by</td><td>timestamptz / uuid</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>live_actions</code></h3><p class="muted">Ações possíveis ao vivo por esporte (gerada do código, como stat_definitions).</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>sport / key</td><td>PK (ex.: volleyball/attack_kill, futsal/goal, basketball/fg3_made)</td></tr><tr><td>label</td><td>text</td></tr><tr><td>score_delta</td><td>smallint (pontos que soma para quem fez: 0, 1, 2, 3)</td></tr><tr><td>stat_key</td><td>text null · FK (sport, stat_key) → stat_definitions (estatística que alimenta)</td></tr><tr><td>kind</td><td>text CHECK in ('stat','substitution','timeout','period_end','opponent_point')</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>rating_snapshots</code></h3><p class="muted">Retrato do OVR do atleta, por time, após cada jogo encerrado.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>team_id / athlete_id / event_id</td><td>uuid FK · PK (team_id, athlete_id, event_id)</td></tr><tr><td>overall</td><td>smallint 40–99</td></tr><tr><td>attributes</td><td>jsonb (chaves do esporte, ex.: {"ATQ":81,…})</td></tr><tr><td>coach_adjustment</td><td>smallint −5..5 default 0 + motivo (auditado)</td></tr><tr><td>created_at</td><td>timestamptz</td></tr></table></article>
+
+    <article class="entity"><span class="badge change">CHANGE</span><h3>Campos novos para a rodada 2</h3>
+      <table><tr><th>Onde</th><th>Campo</th></tr>
+      <tr><td><code>athletes</code></td><td><code>user_id</code> uuid UNIQUE null FK → auth.users (login do atleta)</td></tr>
+      <tr><td><code>team_members</code></td><td><code>sport_attributes</code> jsonb (pé/mão dominante, envergadura… validado pelo módulo)</td></tr>
+      <tr><td><code>events</code></td><td><code>stats_mode</code> CHECK in ('manual','live'); status ganha <code>live</code></td></tr>
+      <tr><td><code>lineups</code></td><td><code>event_id</code> passa a ser null quando é <strong>modelo do time</strong> (<code>team_id</code>, <code>name</code>); UNIQUE parcial: 1 escalação por jogo</td></tr>
+      <tr><td><code>invitations</code></td><td><code>athlete_id</code> null (convite de atleta) e role ganha <code>athlete</code></td></tr></table></article>
+
+    <article class="entity"><span class="badge drop">DROP (F12)</span><h3><code>jogadores_leilao</code>, <code>jogos</code>, <code>estatisticas_individuais</code></h3><p class="muted">Ficam intactas até o contract. Leitura só para backfill e rollback.</p></article>
   </div>
 
   <h3 style="margin-top:18px">Storage</h3>
@@ -196,6 +216,10 @@ create policy events_write on public.events for all to authenticated
     <tr><td>match_results, match_stats</td><td>can_read_team</td><td>can_write_team(team, '{coach,scout}')</td></tr>
     <tr><td>invitations</td><td>owner/admin</td><td>owner/admin; aceite por RPC</td></tr>
     <tr><td>audit_events</td><td>owner/admin</td><td>INSERT só por trigger/RPC; sem UPDATE/DELETE</td></tr>
+    <tr><td>match_live_events</td><td>can_read_team (atleta: times dele)</td><td>só via RPC; can_write_team(team, '{coach,scout}')</td></tr>
+    <tr><td>rating_snapshots</td><td>can_read_team; atleta só as próprias</td><td>só via close_match; ajuste por coach</td></tr>
+    <tr><td>athletes (atleta logado)</td><td>a própria linha (user_id = auth.uid()) + nome/foto/posição dos colegas de time</td><td>nenhum (perfil editado pela comissão)</td></tr>
+    <tr><td>match_stats (atleta logado)</td><td>só as próprias linhas</td><td>nenhum</td></tr>
   </tbody></table></div>
   <div class="note">Teste obrigatório na F1: para cada tabela, um usuário de cada papel + um usuário de outro time + anônimo tentam SELECT/INSERT/UPDATE/DELETE; o resultado tem que bater com esta tabela.</div>
 </section>
@@ -209,6 +233,10 @@ create policy events_write on public.events for all to authenticated
     <article class="endpoint"><p><span class="method">RPC</span> <code>save_lineup(p_event uuid, p_formation text, p_slots jsonb) → uuid</code></p><p>Transação: upsert de <code>lineups</code>, apaga e reinsere <code>lineup_slots</code>. Valida membro ativo e sem repetição.</p></article>
     <article class="endpoint"><p><span class="method">RPC</span> <code>save_match_result(p_event uuid, p_our int, p_their int, p_periods jsonb)</code></p><p>Upsert do resultado e <code>events.status = 'done'</code>. Formato dos períodos validado antes na API pelo módulo do esporte.</p></article>
     <article class="endpoint"><p><span class="method">RPC</span> <code>save_match_stats(p_event uuid, p_athlete uuid, p_stats jsonb)</code></p><p>Upsert de todas as chaves do atleta no jogo; chave com valor 0 é removida (menos linhas).</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>record_live_events(p_event uuid, p_events jsonb) → jsonb</code></p><p>Insere em lote com <code>on conflict (id) do nothing</code> (reenvio seguro); recusa se o jogo não está <code>live</code>; devolve placar atual. Dispara broadcast no canal do jogo.</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>undo_live_event(p_event uuid, p_id uuid)</code></p><p>Marca <code>voided_at</code>; placar recalculado.</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>close_match(p_event uuid, p_final jsonb) → jsonb</code></p><p>Transação: agrega lances válidos em <code>match_stats</code>, grava <code>match_results</code>, calcula retratos de OVR (valores vindos do módulo do esporte), marca <code>done</code>. Reabrir apaga e recalcula (idempotente).</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>athlete_profile(p_athlete uuid) → jsonb</code></p><p>Uma entrada por perfil esportivo (time/esporte): posição, camisa, totais, OVR atual e últimos retratos. Atleta só consegue chamar para si mesmo (RLS).</p></article>
     <article class="endpoint"><p><span class="method">RPC</span> <code>accept_invitation(p_token text) → jsonb</code></p><p>Compara sha256; checa pending, validade e e-mail do usuário; cria o papel; marca accepted; audita. Tudo numa transação.</p></article>
   </div>
 </section>
@@ -265,6 +293,13 @@ select athlete_id, sum(value) from match_stats where stat_key = 'attack_kill' gr
     <article class="endpoint"><p><span class="method">PUT</span> <code>/api/events/:id/stats/:athleteId</code> · coach/scout</p><pre>{"stats":{"attack_kill":12,"attack_error":3,"serve_ace":2}}</pre><p>Chaves fora do esporte → 422. Valores 0–999. Basquete: acertos ≤ tentativas.</p></article>
     <article class="endpoint"><p><span class="method">PUT</span> <code>/api/events/:id/attendance/:athleteId</code> · coach</p><pre>{"status":"yes"}</pre></article>
     <article class="endpoint"><p><span class="method">POST</span> <code>/api/invitations</code> · owner/admin · <span class="method">POST</span> <code>/api/invitations/accept</code> · usuário logado</p><p>Criação devolve o link uma única vez. Aceite chama <code>accept_invitation</code>.</p></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/events/:id/live</code> · coach/scout</p><pre>{"events":[{"id":"9f1c…","seq":41,"period":2,"side":"us",
+  "athleteId":"…","action":"attack_kill"}]}</pre><p>Lote de até 50 lances; ids gerados no aparelho. 200 <code>{"score":{"us":2,"them":1,"current":{"us":14,"them":11}}}</code>. 409 se o jogo não está ao vivo. Limite: 10 lotes por segundo por usuário.</p></article>
+    <article class="endpoint"><p><span class="method">DELETE</span> <code>/api/events/:id/live/:liveId</code> · <span class="method">POST</span> <code>/api/events/:id/close</code></p><p>Desfazer lance · encerrar jogo (chama <code>close_match</code>).</p></article>
+    <article class="endpoint"><p><span class="method">POST / PUT</span> <code>/api/teams/:teamId/lineup-templates[/:id]</code> · coach</p><p>Escalação modelo do time, mesmo formato da escalação do jogo.</p></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/athletes/:id/rating-adjustment</code> · coach</p><pre>{"teamId":"…","value":3,"reason":"evolução no treino"}</pre></article>
+    <article class="endpoint"><p><span class="method">PUT</span> <code>/api/me/attendance/:eventId</code> · atleta</p><pre>{"status":"yes"}</pre><p>Só o próprio atleta, só eventos dos times dele.</p></article>
+    <article class="endpoint"><p><span class="method">REALTIME</span> canal privado <code>match:{eventId}</code></p><p>Broadcast de placar e lances para quem pode ler o time (Realtime Authorization com policy em <code>realtime.messages</code>). Plano grátis: 200 conexões simultâneas e 2 milhões de mensagens/mês, suficiente para o volume da atlética.</p></article>
     <article class="endpoint"><p><span class="method">POST</span> <code>/api/auth/login</code> · <code>/api/auth/logout</code></p><p>Sem mudança (reaproveitado).</p></article>
   </div>
   <p class="muted"><strong>Leitura</strong> não tem rota de API: as pages chamam o banco no servidor (tabelas com RLS e RPCs). Se uma tela cliente precisar recarregar dados, usa Server Action ou <code>router.refresh()</code>.</p>
