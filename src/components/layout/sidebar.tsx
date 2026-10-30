@@ -84,7 +84,7 @@ export default function Sidebar() {
           <div className="sidebar-brand">
             <div className="sidebar-brand-mark">
               <Image
-                src="/falcons-volley-logo.png"
+                src="/falcons-logo.png"
                 alt="Logo Falcons Volei"
                 width={36}
                 height={36}
