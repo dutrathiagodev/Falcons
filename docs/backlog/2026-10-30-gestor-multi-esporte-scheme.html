@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Esquema do Gestor Multi-esporte</title>
+<style>
+:root{--bg:#0c1220;--panel:#131d31;--panel2:#192640;--ink:#edf3ff;--muted:#a9b7d1;--line:#2a3a5c;--accent:#79a7ff;--new:#55d6a7;--reuse:#d6b45f;--change:#ff8f70;--code:#09101d;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#080d18,#111a2c);color:var(--ink);line-height:1.48}
+.page{max-width:1260px;margin:auto;padding:30px}
+.hero,.section,.entity,.endpoint{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.hero,.section{margin-bottom:18px}.hero{background:radial-gradient(circle at top right,#243a67,#121b2e 55%)}
+h1{font-size:clamp(2rem,5vw,3.4rem);margin:.1em 0}h2{margin:0 0 14px}h3{margin:6px 0 8px;font-size:1.05rem}
+.muted,small{color:var(--muted)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.chip,.badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:4px 9px;font-size:.85rem}
+.badge.new{color:var(--new)}.badge.reuse{color:var(--reuse)}.badge.change{color:var(--change)}.badge.drop{color:#ff6b6b}
+.warn{border-left:5px solid var(--change);background:#2a1a20;padding:14px;border-radius:9px}
+.note{border-left:5px solid var(--accent);background:#14213b;padding:12px 14px;border-radius:9px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:13px}
+.entity,.endpoint{background:var(--panel2)}
+table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:#fff}
+.table-wrap{overflow-x:auto}.entity td{overflow-wrap:anywhere}
+code,pre{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--code)}code{padding:1px 5px;border-radius:5px;font-size:.88em}
+pre{padding:12px;border-radius:9px;overflow:auto;color:#d9e6ff;font-size:.85rem}
+.method{font-weight:800;color:var(--accent)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}nav.toc a{color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.9rem}
+a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pii{color:var(--change);font-weight:700}
+@media(max-width:800px){.page{padding:14px}.two{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+@media print{body{background:#fff;color:#111}.hero,.section,.entity,.endpoint{background:#fff;border-color:#bbb}.muted,small{color:#444}code,pre{background:#f4f4f4;color:#111}}
+</style>
+</head>
+<body><main class="page">
+
+<header class="hero">
+  <p class="muted">FALCONS / GESTOR MULTI-ESPORTE</p>
+  <h1>Esquema de banco e API</h1>
+  <p>Contrato técnico: tabelas, regras de integridade, RLS, RPCs, rotas da API e módulos de esporte.</p>
+  <div class="chips">
+    <span class="chip">Status: draft</span><span class="chip">Autoridade: contrato proposto</span><span class="chip">Verificado: 2026-10-30 (develop a60cf73)</span><span class="chip">Plano: 2026-10-30-gestor-multi-esporte.md</span>
+  </div>
+  <nav class="toc" aria-label="Seções">
+    <a href="#fronteira">Fronteira</a><a href="#modelo">A · Modelo</a><a href="#relacoes">Relações</a><a href="#rls">RLS</a><a href="#rpc">RPCs</a><a href="#indices">Índices</a><a href="#migracao">Migração</a><a href="#api">B · API</a><a href="#esportes">C · Esportes</a><a href="#perf">D · Performance e custo</a><a href="#checklist">Checklist</a>
+  </nav>
+</header>
+
+<section class="section" id="fronteira">
+  <div class="warn"><strong>Fronteira de arquitetura (verificada no repositório):</strong> Next.js 16 na Vercel. <strong>Leitura</strong>: Server Components com o cliente Supabase de servidor e a sessão do usuário (RLS aplica). <strong>Escrita</strong>: somente Route Handlers em <code>src/app/api</code> → validação → RPC/tabela com a sessão do usuário (RLS aplica). <strong>Proibido:</strong> cliente Supabase no navegador, chave <code>service_role</code> no app, policy para <code>anon</code>, bucket público para fotos de atletas, regra de permissão só na API.</div>
+  <p><strong>Verificado contra:</strong> <code>supabase/migrations/20260426174937_init_jogadores.sql</code>, <code>20260430163000_calendar_and_performance.sql</code>, <code>20261030120000_lock_down_rls.sql</code>, <code>src/lib/api.ts</code>, <code>src/app/api/**</code>, <code>src/lib/supabase/*</code>, <code>src/proxy.ts</code>, <code>src/lib/volleyball.ts</code>.</p>
+  <p class="muted">Convenções: chaves <code>uuid</code> com <code>gen_random_uuid()</code>; datas <code>timestamptz</code>; texto de estado com <code>CHECK</code> (mais fácil de evoluir que enum); nomes em inglês; <span class="pii">PII</span> = dado pessoal.</p>
+</section>
+
+<section class="section" id="modelo">
+  <h2>A · Modelo de dados</h2>
+
+  <h3>Organização, times e acesso</h3>
+  <div class="grid">
+    <article class="entity"><span class="badge new">NEW</span><h3><code>organizations</code></h3><p class="muted">Clube ou atlética. Dona dos times e dos atletas.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>uuid PK</td></tr><tr><td>name</td><td>text NOT NULL, 2–80</td></tr><tr><td>slug</td><td>text UNIQUE, <code>^[a-z0-9-]{2,40}$</code></td></tr><tr><td>created_at</td><td>timestamptz default now()</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>org_memberships</code></h3><p class="muted">Quem administra a organização.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>organization_id</td><td>uuid FK → organizations ON DELETE CASCADE</td></tr><tr><td>user_id</td><td>uuid FK → auth.users ON DELETE CASCADE</td></tr><tr><td>role</td><td>text CHECK in ('owner','admin')</td></tr><tr><td>created_at</td><td>timestamptz</td></tr><tr><td colspan="2">PK (organization_id, user_id) · pelo menos 1 owner por organização (trigger)</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>teams</code></h3><p class="muted">Time de um esporte. O esporte define toda a funcionalidade.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>uuid PK</td></tr><tr><td>organization_id</td><td>uuid FK → organizations, NOT NULL</td></tr><tr><td>name</td><td>text NOT NULL</td></tr><tr><td>slug</td><td>text · UNIQUE (organization_id, slug)</td></tr><tr><td>sport</td><td>text FK → sports(key) NOT NULL · troca bloqueada se houver dados (trigger)</td></tr><tr><td>category</td><td>text CHECK in ('male','female','mixed') + age_group text null (ex.: 'sub17')</td></tr><tr><td>color</td><td>text <code>^#[0-9a-f]{6}$</code></td></tr><tr><td>status</td><td>text CHECK in ('active','archived') default 'active'</td></tr><tr><td>created_at</td><td>timestamptz</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>team_staff</code></h3><p class="muted">Comissão do time.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>team_id</td><td>uuid FK → teams ON DELETE CASCADE</td></tr><tr><td>user_id</td><td>uuid FK → auth.users ON DELETE CASCADE</td></tr><tr><td>role</td><td>text CHECK in ('coach','scout','viewer')</td></tr><tr><td colspan="2">PK (team_id, user_id)</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>invitations</code></h3><p class="muted">Convite de uso único.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>uuid PK</td></tr><tr><td>organization_id</td><td>uuid FK</td></tr><tr><td>team_id</td><td>uuid FK null (null = papel na organização)</td></tr><tr><td>email</td><td>citext NOT NULL <span class="pii">PII</span></td></tr><tr><td>role</td><td>text CHECK in ('admin','coach','scout','viewer')</td></tr><tr><td>token_hash</td><td>bytea UNIQUE (sha256 do token; o token nunca é salvo)</td></tr><tr><td>status</td><td>pending · accepted · revoked (expirado = calculado)</td></tr><tr><td>expires_at</td><td>timestamptz (now + 7 dias)</td></tr><tr><td>created_by / accepted_by</td><td>uuid FK auth.users</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>audit_events</code></h3><p class="muted">Quem fez o quê. Somente inserção (sem UPDATE/DELETE para usuários).</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>bigint identity PK</td></tr><tr><td>organization_id</td><td>uuid FK</td></tr><tr><td>actor_id</td><td>uuid (auth.uid())</td></tr><tr><td>action</td><td>text (ex.: athlete.created, athlete.erased, staff.role_changed)</td></tr><tr><td>entity / entity_id</td><td>text / uuid</td></tr><tr><td>created_at</td><td>timestamptz</td></tr><tr><td colspan="2">Sem dados pessoais no registro. Retenção: 1 ano (job mensal).</td></tr></table></article>
+  </div>
+
+  <h3 style="margin-top:18px">Referência de esportes (geradas a partir do código)</h3>
+  <div class="grid">
+    <article class="entity"><span class="badge new">NEW</span><h3><code>sports</code></h3><p class="muted">Leitura pública para autenticados; escrita só por migration.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>key</td><td>text PK (volleyball, futsal, football_society, football_field, basketball, handball)</td></tr><tr><td>family</td><td>text (volleyball, football, basketball, handball, generic)</td></tr><tr><td>name</td><td>text</td></tr><tr><td>players_on_field</td><td>smallint</td></tr><tr><td>score_model</td><td>text CHECK in ('sets','periods')</td></tr></table></article>
+    <article class="entity"><span class="badge new">NEW</span><h3><code>sport_positions</code></h3>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>sport</td><td>text FK → sports</td></tr><tr><td>key</td><td>text (ex.: setter, libero, goalkeeper, point_guard)</td></tr><tr><td>label / short_label</td><td>text (pt-BR)</td></tr><tr><td>sort</td><td>smallint</td></tr><tr><td colspan="2">PK (sport, key)</td></tr></table></article>
+    <article class="entity"><span class="badge new">NEW</span><h3><code>stat_definitions</code></h3>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>sport</td><td>text FK → sports</td></tr><tr><td>key</td><td>text (ex.: attack_kill, goals, fg3_made)</td></tr><tr><td>label</td><td>text</td></tr><tr><td>group_key</td><td>text (ex.: ataque, finalização)</td></tr><tr><td>polarity</td><td>text CHECK in ('positive','neutral','negative')</td></tr><tr><td>pair_key</td><td>text null (acertos ↔ tentativas no basquete)</td></tr><tr><td>sort</td><td>smallint</td></tr><tr><td colspan="2">PK (sport, key)</td></tr></table></article>
+  </div>
+
+  <h3 style="margin-top:18px">Atletas</h3>
+  <div class="grid">
+    <article class="entity"><span class="badge change">CHANGE</span><h3><code>athletes</code> <small>(substitui jogadores_leilao)</small></h3><p class="muted">Dados que a comissão precisa ver. Pertence à organização.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>uuid PK (mesmo id do jogador antigo no backfill)</td></tr><tr><td>organization_id</td><td>uuid FK NOT NULL</td></tr><tr><td>full_name</td><td>text NOT NULL 2–120</td></tr><tr><td>nickname</td><td>text null</td></tr><tr><td>photo_path</td><td>text null (caminho no bucket privado, nunca URL)</td></tr><tr><td>height_cm / weight_kg</td><td>smallint / numeric(5,2) com CHECK de faixa</td></tr><tr><td>dominant_side</td><td>text CHECK in ('left','right','both') null</td></tr><tr><td>course / class_year</td><td>text / smallint (atlética)</td></tr><tr><td>status</td><td>text CHECK in ('active','injured','inactive')</td></tr><tr><td>notes</td><td>text ≤ 2000</td></tr><tr><td>created_at / updated_at</td><td>timestamptz</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>athlete_private</code></h3><p class="muted">Dados pessoais. Só owner/admin leem e escrevem.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>athlete_id</td><td>uuid PK FK → athletes ON DELETE CASCADE</td></tr><tr><td>birth_date</td><td>date <span class="pii">PII</span></td></tr><tr><td>phone</td><td>text <span class="pii">PII</span></td></tr><tr><td>document_id</td><td>text <span class="pii">PII</span> · opcional (recomendado não coletar)</td></tr><tr><td>guardian_name / guardian_phone</td><td>text <span class="pii">PII</span></td></tr><tr><td>guardian_consent_at</td><td>timestamptz (obrigatório para foto de menor)</td></tr></table>
+      <p><small>Idade e "é menor" para o dashboard vêm de RPC que devolve só a média/flag, nunca a data.</small></p></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>team_members</code></h3><p class="muted">Vínculo atleta ↔ time, com dados que dependem do esporte.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>team_id</td><td>uuid FK → teams ON DELETE CASCADE</td></tr><tr><td>athlete_id</td><td>uuid FK → athletes ON DELETE CASCADE</td></tr><tr><td>sport</td><td>text (copiado do time por trigger; usado nas FKs)</td></tr><tr><td>position_key</td><td>text · FK (sport, position_key) → sport_positions</td></tr><tr><td>jersey_number</td><td>smallint 0–99 · UNIQUE (team_id, jersey_number) WHERE active</td></tr><tr><td>active</td><td>boolean default true</td></tr><tr><td>joined_at</td><td>date</td></tr><tr><td colspan="2">PK (team_id, athlete_id) · trigger: atleta e time da mesma organização</td></tr></table></article>
+  </div>
+
+  <h3 style="margin-top:18px">Agenda, jogos e estatísticas</h3>
+  <div class="grid">
+    <article class="entity"><span class="badge change">CHANGE</span><h3><code>events</code> <small>(substitui jogos)</small></h3>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>uuid PK</td></tr><tr><td>team_id</td><td>uuid FK NOT NULL</td></tr><tr><td>kind</td><td>text CHECK in ('match','training','meeting','other')</td></tr><tr><td>competition</td><td>text CHECK in ('championship','friendly') · obrigatório se match</td></tr><tr><td>title / opponent / location</td><td>text</td></tr><tr><td>starts_at / ends_at</td><td>timestamptz · ends_at ≥ starts_at</td></tr><tr><td>status</td><td>text CHECK in ('scheduled','done','canceled')</td></tr><tr><td>notes</td><td>text</td></tr><tr><td>created_by</td><td>uuid</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>match_results</code></h3>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>event_id</td><td>uuid PK FK → events (kind = match)</td></tr><tr><td>our_score / their_score</td><td>smallint ≥ 0 (sets vencidos ou gols/pontos)</td></tr><tr><td>periods</td><td>jsonb · array de <code>{"us":25,"them":20}</code> (sets, tempos ou quartos); formato validado pela RPC conforme o esporte</td></tr><tr><td>updated_at / updated_by</td><td>timestamptz / uuid</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>lineups</code> + <code>lineup_slots</code></h3>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>lineups.id</td><td>uuid PK</td></tr><tr><td>lineups.event_id</td><td>uuid FK UNIQUE (1 escalação inicial por jogo)</td></tr><tr><td>lineups.formation_key</td><td>text (validado pelo módulo do esporte)</td></tr><tr><td>lineup_slots.lineup_id</td><td>uuid FK ON DELETE CASCADE</td></tr><tr><td>lineup_slots.slot_key</td><td>text (P1–P6, L, GK, LB, ST…; 'BENCH_n' para reservas)</td></tr><tr><td>lineup_slots.athlete_id</td><td>uuid FK</td></tr><tr><td colspan="2">PK (lineup_id, slot_key) · UNIQUE (lineup_id, athlete_id)</td></tr></table></article>
+
+    <article class="entity"><span class="badge change">CHANGE</span><h3><code>match_stats</code> <small>(substitui estatisticas_individuais)</small></h3><p class="muted">Uma linha por jogo × atleta × estatística.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>event_id</td><td>uuid FK → events ON DELETE CASCADE</td></tr><tr><td>athlete_id</td><td>uuid FK → athletes ON DELETE CASCADE</td></tr><tr><td>sport</td><td>text (copiado do time por trigger)</td></tr><tr><td>stat_key</td><td>text · FK (sport, stat_key) → stat_definitions</td></tr><tr><td>value</td><td>integer CHECK 0..999</td></tr><tr><td colspan="2">PK (event_id, athlete_id, stat_key) · trigger: atleta é membro do time do evento</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>event_attendance</code></h3>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>event_id</td><td>uuid FK ON DELETE CASCADE</td></tr><tr><td>athlete_id</td><td>uuid FK ON DELETE CASCADE</td></tr><tr><td>status</td><td>text CHECK in ('pending','yes','no','maybe')</td></tr><tr><td>updated_at / updated_by</td><td>timestamptz / uuid</td></tr><tr><td colspan="2">PK (event_id, athlete_id)</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>match_live_events</code></h3><p class="muted">Lances do jogo ao vivo (fonte da verdade quando <code>events.stats_mode = 'live'</code>).</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>id</td><td>uuid PK · <strong>gerado no aparelho</strong> (idempotência: reenviar não duplica)</td></tr><tr><td>event_id</td><td>uuid FK → events ON DELETE CASCADE</td></tr><tr><td>seq</td><td>integer (ordem no jogo) · UNIQUE (event_id, seq)</td></tr><tr><td>period</td><td>smallint (set, tempo ou quarto)</td></tr><tr><td>clock_ms</td><td>integer null (cronômetro do jogo, quando o esporte usa)</td></tr><tr><td>side</td><td>text CHECK in ('us','them')</td></tr><tr><td>athlete_id</td><td>uuid FK null (null em ponto do adversário)</td></tr><tr><td>sport / action_key</td><td>text · FK (sport, action_key) → live_actions</td></tr><tr><td>payload</td><td>jsonb pequeno (ex.: sai/entra na substituição)</td></tr><tr><td>voided_at / voided_by</td><td>desfazer marca, não apaga</td></tr><tr><td>recorded_at / recorded_by</td><td>timestamptz / uuid</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>live_actions</code></h3><p class="muted">Ações possíveis ao vivo por esporte (gerada do código, como stat_definitions).</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>sport / key</td><td>PK (ex.: volleyball/attack_kill, futsal/goal, basketball/fg3_made)</td></tr><tr><td>label</td><td>text</td></tr><tr><td>score_delta</td><td>smallint (pontos que soma para quem fez: 0, 1, 2, 3)</td></tr><tr><td>stat_key</td><td>text null · FK (sport, stat_key) → stat_definitions (estatística que alimenta)</td></tr><tr><td>kind</td><td>text CHECK in ('stat','substitution','timeout','period_end','opponent_point')</td></tr></table></article>
+
+    <article class="entity"><span class="badge new">NEW</span><h3><code>rating_snapshots</code></h3><p class="muted">Retrato do OVR do atleta, por time, após cada jogo encerrado.</p>
+      <table><tr><th>Campo</th><th>Tipo / regra</th></tr>
+      <tr><td>team_id / athlete_id / event_id</td><td>uuid FK · PK (team_id, athlete_id, event_id)</td></tr><tr><td>overall</td><td>smallint 40–99</td></tr><tr><td>attributes</td><td>jsonb (chaves do esporte, ex.: {"ATQ":81,…})</td></tr><tr><td>coach_adjustment</td><td>smallint −5..5 default 0 + motivo (auditado)</td></tr><tr><td>created_at</td><td>timestamptz</td></tr></table></article>
+
+    <article class="entity"><span class="badge change">CHANGE</span><h3>Campos novos para a rodada 2</h3>
+      <table><tr><th>Onde</th><th>Campo</th></tr>
+      <tr><td><code>athletes</code></td><td><code>user_id</code> uuid UNIQUE null FK → auth.users (login do atleta)</td></tr>
+      <tr><td><code>team_members</code></td><td><code>sport_attributes</code> jsonb (pé/mão dominante, envergadura… validado pelo módulo)</td></tr>
+      <tr><td><code>events</code></td><td><code>stats_mode</code> CHECK in ('manual','live'); status ganha <code>live</code></td></tr>
+      <tr><td><code>lineups</code></td><td><code>event_id</code> passa a ser null quando é <strong>modelo do time</strong> (<code>team_id</code>, <code>name</code>); UNIQUE parcial: 1 escalação por jogo</td></tr>
+      <tr><td><code>invitations</code></td><td><code>athlete_id</code> null (convite de atleta) e role ganha <code>athlete</code></td></tr></table></article>
+
+    <article class="entity"><span class="badge drop">DROP (F12)</span><h3><code>jogadores_leilao</code>, <code>jogos</code>, <code>estatisticas_individuais</code></h3><p class="muted">Ficam intactas até o contract. Leitura só para backfill e rollback.</p></article>
+  </div>
+
+  <h3 style="margin-top:18px">Storage</h3>
+  <div class="grid">
+    <article class="entity"><span class="badge change">CHANGE</span><h3>bucket <code>athlete-photos</code> (privado)</h3><p>Caminho <code>{organization_id}/{athlete_id}.webp</code>; 512 px, WebP, ≤ 300 KB (limite do bucket); upload só via API; leitura por URL assinada (1 h) criada no servidor para quem pode ler o atleta. Policies de <code>storage.objects</code> usam o primeiro segmento do caminho para checar a organização. O bucket público atual <code>fotos-jogadores</code> é migrado e removido no contract.</p></article>
+  </div>
+</section>
+
+<section class="section" id="relacoes">
+  <h2>Relações</h2>
+  <div class="two">
+<pre>organizations 1 ── N org_memberships N ── 1 auth.users
+organizations 1 ── N teams 1 ── N team_staff N ── 1 auth.users
+organizations 1 ── N athletes 1 ── 1 athlete_private
+teams 1 ── N team_members N ── 1 athletes
+sports 1 ── N teams
+sports 1 ── N sport_positions   (team_members.position_key)
+sports 1 ── N stat_definitions  (match_stats.stat_key)
+teams 1 ── N events 1 ── 0..1 match_results
+events 1 ── 0..1 lineups 1 ── N lineup_slots
+events 1 ── N match_stats N ── 1 athletes
+events 1 ── N event_attendance N ── 1 athletes
+organizations 1 ── N invitations, audit_events</pre>
+    <div class="table-wrap"><table><thead><tr><th>Exclusão</th><th>Comportamento</th></tr></thead><tbody>
+      <tr><td>organização</td><td>cascade em tudo (só owner, com confirmação)</td></tr>
+      <tr><td>time</td><td>preferir arquivar; excluir apaga eventos, escalações, estatísticas</td></tr>
+      <tr><td>atleta</td><td>cascade em privado, vínculos, slots, estatísticas, presença + foto pela API</td></tr>
+      <tr><td>evento</td><td>cascade em resultado, escalação, estatísticas, presença</td></tr>
+      <tr><td>usuário (auth)</td><td>remove papéis; auditoria mantém só o id</td></tr>
+    </tbody></table></div>
+  </div>
+</section>
+
+<section class="section" id="rls">
+  <h2>RLS e funções de permissão</h2>
+  <p>Schema <code>private</code> não é exposto pela API do Supabase. Funções <code>SECURITY DEFINER</code>, <code>STABLE</code>, <code>SET search_path = ''</code>, com nomes totalmente qualificados.</p>
+<pre>private.has_org_role(org uuid, roles text[]) → boolean
+  -- auth.uid() tem um dos papéis na organização
+
+private.can_read_team(team uuid) → boolean
+  -- staff do time (qualquer papel) OU owner/admin da organização do time
+
+private.can_write_team(team uuid, roles text[] default '{coach}') → boolean
+  -- time active E (papel do time em roles OU owner/admin da organização)
+
+-- Uso nas policies (o select faz o Postgres calcular uma vez por consulta):
+create policy events_read on public.events for select to authenticated
+  using ((select private.can_read_team(team_id)));
+create policy events_write on public.events for all to authenticated
+  using ((select private.can_write_team(team_id)))
+  with check ((select private.can_write_team(team_id)));</pre>
+  <div class="table-wrap"><table><thead><tr><th>Tabela</th><th>SELECT</th><th>INSERT / UPDATE / DELETE</th></tr></thead><tbody>
+    <tr><td>organizations</td><td>membro da org ou staff de algum time dela</td><td>só owner (UPDATE); criação por RPC de bootstrap</td></tr>
+    <tr><td>org_memberships</td><td>owner/admin da org; o próprio usuário</td><td>owner (admin não promove a owner)</td></tr>
+    <tr><td>teams</td><td>can_read_team(id)</td><td>owner/admin</td></tr>
+    <tr><td>team_staff</td><td>can_read_team</td><td>owner/admin</td></tr>
+    <tr><td>sports, sport_positions, stat_definitions</td><td>authenticated</td><td>nenhum (só migration)</td></tr>
+    <tr><td>athletes</td><td>owner/admin da org OU membro de algum time onde o atleta está</td><td>owner/admin; coach só INSERT via RPC que já vincula ao próprio time</td></tr>
+    <tr><td>athlete_private</td><td><strong>só owner/admin</strong></td><td>só owner/admin</td></tr>
+    <tr><td>team_members</td><td>can_read_team</td><td>can_write_team (coach)</td></tr>
+    <tr><td>events, lineups, lineup_slots, event_attendance</td><td>can_read_team</td><td>can_write_team (coach)</td></tr>
+    <tr><td>match_results, match_stats</td><td>can_read_team</td><td>can_write_team(team, '{coach,scout}')</td></tr>
+    <tr><td>invitations</td><td>owner/admin</td><td>owner/admin; aceite por RPC</td></tr>
+    <tr><td>audit_events</td><td>owner/admin</td><td>INSERT só por trigger/RPC; sem UPDATE/DELETE</td></tr>
+    <tr><td>match_live_events</td><td>can_read_team (atleta: times dele)</td><td>só via RPC; can_write_team(team, '{coach,scout}')</td></tr>
+    <tr><td>rating_snapshots</td><td>can_read_team; atleta só as próprias</td><td>só via close_match; ajuste por coach</td></tr>
+    <tr><td>athletes (atleta logado)</td><td>a própria linha (user_id = auth.uid()) + nome/foto/posição dos colegas de time</td><td>nenhum (perfil editado pela comissão)</td></tr>
+    <tr><td>match_stats (atleta logado)</td><td>só as próprias linhas</td><td>nenhum</td></tr>
+  </tbody></table></div>
+  <div class="note">Teste obrigatório na F1: para cada tabela, um usuário de cada papel + um usuário de outro time + anônimo tentam SELECT/INSERT/UPDATE/DELETE; o resultado tem que bater com esta tabela.</div>
+</section>
+
+<section class="section" id="rpc">
+  <h2>RPCs (Postgres)</h2>
+  <p class="muted">Todas <code>SECURITY INVOKER</code> (o RLS do usuário vale dentro delas), exceto <code>accept_invitation</code> e <code>create_organization</code>, que precisam criar o primeiro vínculo e por isso validam tudo internamente.</p>
+  <div class="grid">
+    <article class="endpoint"><p><span class="method">RPC</span> <code>team_dashboard(p_team uuid) → jsonb</code></p><p>Uma ida ao banco por dashboard: elenco por posição, disponíveis, próximos 3 eventos, últimos 5 resultados, aproveitamento, saldo, líderes (top 3 das estatísticas-chave do esporte), médias de altura/idade (sem datas).</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>athlete_season_stats(p_team uuid, p_from date default null) → table</code></p><p>Totais e médias por atleta × estatística; base do ranking e do overall calculado no módulo do esporte.</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>save_lineup(p_event uuid, p_formation text, p_slots jsonb) → uuid</code></p><p>Transação: upsert de <code>lineups</code>, apaga e reinsere <code>lineup_slots</code>. Valida membro ativo e sem repetição.</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>save_match_result(p_event uuid, p_our int, p_their int, p_periods jsonb)</code></p><p>Upsert do resultado e <code>events.status = 'done'</code>. Formato dos períodos validado antes na API pelo módulo do esporte.</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>save_match_stats(p_event uuid, p_athlete uuid, p_stats jsonb)</code></p><p>Upsert de todas as chaves do atleta no jogo; chave com valor 0 é removida (menos linhas).</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>record_live_events(p_event uuid, p_events jsonb) → jsonb</code></p><p>Insere em lote com <code>on conflict (id) do nothing</code> (reenvio seguro); recusa se o jogo não está <code>live</code>; devolve placar atual. Dispara broadcast no canal do jogo.</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>undo_live_event(p_event uuid, p_id uuid)</code></p><p>Marca <code>voided_at</code>; placar recalculado.</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>close_match(p_event uuid, p_final jsonb) → jsonb</code></p><p>Transação: agrega lances válidos em <code>match_stats</code>, grava <code>match_results</code>, calcula retratos de OVR (valores vindos do módulo do esporte), marca <code>done</code>. Reabrir apaga e recalcula (idempotente).</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>athlete_profile(p_athlete uuid) → jsonb</code></p><p>Uma entrada por perfil esportivo (time/esporte): posição, camisa, totais, OVR atual e últimos retratos. Atleta só consegue chamar para si mesmo (RLS).</p></article>
+    <article class="endpoint"><p><span class="method">RPC</span> <code>accept_invitation(p_token text) → jsonb</code></p><p>Compara sha256; checa pending, validade e e-mail do usuário; cria o papel; marca accepted; audita. Tudo numa transação.</p></article>
+  </div>
+</section>
+
+<section class="section" id="indices">
+  <h2>Índices (padrões de acesso)</h2>
+  <div class="table-wrap"><table><thead><tr><th>Índice</th><th>Atende</th></tr></thead><tbody>
+    <tr><td><code>team_staff (user_id)</code>, <code>org_memberships (user_id)</code></td><td>funções de permissão e seletor de times</td></tr>
+    <tr><td><code>teams (organization_id, status)</code></td><td>lista de times</td></tr>
+    <tr><td><code>team_members (athlete_id)</code></td><td>times de um atleta; policy de athletes</td></tr>
+    <tr><td><code>events (team_id, starts_at desc)</code></td><td>agenda, próximos e últimos jogos</td></tr>
+    <tr><td><code>match_stats (athlete_id)</code> (PK cobre event_id)</td><td>estatísticas por atleta</td></tr>
+    <tr><td><code>event_attendance</code> PK</td><td>presença por evento</td></tr>
+    <tr><td><code>athletes (organization_id, full_name)</code> + trigram em full_name</td><td>busca de atleta antes de cadastrar</td></tr>
+    <tr><td><code>audit_events (organization_id, created_at desc)</code></td><td>tela de auditoria</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="section" id="migracao">
+  <h2>Migração, backfill, verificação e rollback</h2>
+  <div class="table-wrap"><table><thead><tr><th>Fase</th><th>Ação</th><th>Evidência / rollback</th></tr></thead><tbody>
+    <tr><td>Expand (F1)</td><td><code>*_foundation.sql</code>: schema private, funções, tabelas novas, policies, índices, seed de esportes gerado.</td><td>Testes de RLS. Rollback: <code>drop</code> das tabelas novas (antigas intactas).</td></tr>
+    <tr><td>Backfill (F3)</td><td><code>*_backfill_falcons.sql</code>, idempotente (<code>on conflict do nothing</code>): org "Atlética FAP", time "Falcons Vôlei" (volleyball), owner = conta do Thiago; jogadores → athletes (mesmo id) + athlete_private + team_members (posição mapeada: LEVANTADOR→setter, OPOSTO→opposite, PONTEIRO→outside, CENTRAL→middle, LIBERO→libero); jogos → events + match_results; cada coluna de estatisticas_individuais → linha em match_stats; fotos copiadas para o bucket privado.</td><td>Consultas de conferência abaixo. Rollback: apagar a org criada (cascade).</td></tr>
+    <tr><td>Switch (F4–F5)</td><td>Deploy do app lendo/escrevendo só tabelas novas.</td><td>Smoke test em produção. Rollback: redeploy anterior.</td></tr>
+    <tr><td>Contract (F9)</td><td>Depois de 2 semanas e backup verificado: drop das tabelas antigas e do bucket público.</td><td>Irreversível sem backup: exige confirmação explícita do Thiago.</td></tr>
+  </tbody></table></div>
+  <p><strong>Mapeamento das estatísticas de vôlei:</strong> passe_a/b/c → pass_a/b/c · toque_bom/medio/ruim → set_good/ok/bad · saque_ace/bom/erro → serve_ace/good/error · ataque_ponto/medio/erro → attack_kill/ok/error · bloqueio_ponto/medio/erro → block_point/ok/error · nocao_boa/media/ruim → reading_good/ok/bad · pulo_bom/medio/ruim → jump_good/ok/bad.</p>
+<pre>-- Conferência (os pares têm que ser iguais)
+select count(*) from jogadores_leilao;                      -- = athletes da org Falcons
+select count(*) from jogos;                                 -- = events do time Falcons Vôlei
+select sum(passe_a) from estatisticas_individuais;          -- = sum(value) where stat_key = 'pass_a'
+select jogador_id, sum(ataque_ponto) from estatisticas_individuais group by 1
+  except
+select athlete_id, sum(value) from match_stats where stat_key = 'attack_kill' group by 1;  -- 0 linhas</pre>
+</section>
+
+<section class="section" id="api">
+  <h2>B · API (Next.js Route Handlers)</h2>
+  <div class="note">Comum a todas as rotas de escrita: checagem de Origin (CSRF) → <code>getUser()</code> → parse com allowlist → validação do módulo do esporte → RPC/tabela com a sessão do usuário. Respostas: <code>400</code> validação · <code>401</code> sem sessão · <code>403</code> origem · <code>404</code> não existe ou sem permissão · <code>409</code> conflito · <code>422</code> regra do esporte (lista de problemas) · <code>503</code> banco indisponível. Logs sem dados pessoais. PUT são idempotentes.</div>
+  <div class="grid">
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/teams</code> · owner/admin</p><pre>{"name":"Falcons Futsal","sport":"futsal","category":"male","color":"#22c55e"}</pre><p>201 <code>{"id":"…","slug":"falcons-futsal"}</code> · 409 slug em uso.</p></article>
+    <article class="endpoint"><p><span class="method">PATCH</span> <code>/api/teams/:teamId</code> · owner/admin</p><p>Nome, cor, categoria, status. Troca de <code>sport</code> → 409 se houver dados.</p></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/athletes</code> · owner/admin/coach</p><pre>{"fullName":"Ana Souza","nickname":"Aninha","heightCm":178,
+ "team":{"teamId":"…","positionKey":"outside","jerseyNumber":7}}</pre><p>Coach precisa enviar <code>team</code> do próprio time. 201 com id.</p></article>
+    <article class="endpoint"><p><span class="method">PATCH / DELETE</span> <code>/api/athletes/:id</code></p><p>PATCH: owner/admin/coach (campos públicos). DELETE: owner/admin, exclusão total + foto + auditoria; 204.</p></article>
+    <article class="endpoint"><p><span class="method">PUT</span> <code>/api/athletes/:id/private</code> · owner/admin</p><pre>{"birthDate":"2008-05-02","phone":"…","guardianName":"…","guardianConsent":true}</pre></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/photos</code> · quem pode editar o atleta</p><p>multipart <code>file</code> + <code>athleteId</code>; JPG/PNG/WEBP ≤ 300 KB (já redimensionado no navegador); menor sem consentimento → 422. Resposta: URL assinada.</p></article>
+    <article class="endpoint"><p><span class="method">POST / PATCH / DELETE</span> <code>/api/teams/:teamId/members[/:athleteId]</code> · coach</p><pre>{"athleteId":"…","positionKey":"libero","jerseyNumber":2}</pre><p>422 posição de outro esporte · 409 camisa em uso.</p></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/teams/:teamId/events</code> · coach</p><pre>{"kind":"match","competition":"friendly","opponent":"Tigres",
+ "startsAt":"2026-11-10T19:00:00-03:00","location":"Ginásio FAP"}</pre></article>
+    <article class="endpoint"><p><span class="method">PATCH / DELETE</span> <code>/api/events/:id</code> · coach</p><p>Cancelar = PATCH <code>{"status":"canceled"}</code>; jogo com placar não cancela (409).</p></article>
+    <article class="endpoint"><p><span class="method">PUT</span> <code>/api/events/:id/result</code> · coach/scout</p><pre>{"periods":[{"us":25,"them":20},{"us":23,"them":25},{"us":25,"them":18},{"us":25,"them":21}]}</pre><p>Placar final calculado pelo módulo do esporte (vôlei: sets vencidos). 422 se fora da regra.</p></article>
+    <article class="endpoint"><p><span class="method">PUT</span> <code>/api/events/:id/lineup</code> · coach</p><pre>{"formationKey":"5-1","slots":[{"slotKey":"P1","athleteId":"…"},{"slotKey":"L","athleteId":"…"}]}</pre></article>
+    <article class="endpoint"><p><span class="method">PUT</span> <code>/api/events/:id/stats/:athleteId</code> · coach/scout</p><pre>{"stats":{"attack_kill":12,"attack_error":3,"serve_ace":2}}</pre><p>Chaves fora do esporte → 422. Valores 0–999. Basquete: acertos ≤ tentativas.</p></article>
+    <article class="endpoint"><p><span class="method">PUT</span> <code>/api/events/:id/attendance/:athleteId</code> · coach</p><pre>{"status":"yes"}</pre></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/invitations</code> · owner/admin · <span class="method">POST</span> <code>/api/invitations/accept</code> · usuário logado</p><p>Criação devolve o link uma única vez. Aceite chama <code>accept_invitation</code>.</p></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/events/:id/live</code> · coach/scout</p><pre>{"events":[{"id":"9f1c…","seq":41,"period":2,"side":"us",
+  "athleteId":"…","action":"attack_kill"}]}</pre><p>Lote de até 50 lances; ids gerados no aparelho. 200 <code>{"score":{"us":2,"them":1,"current":{"us":14,"them":11}}}</code>. 409 se o jogo não está ao vivo. Limite: 10 lotes por segundo por usuário.</p></article>
+    <article class="endpoint"><p><span class="method">DELETE</span> <code>/api/events/:id/live/:liveId</code> · <span class="method">POST</span> <code>/api/events/:id/close</code></p><p>Desfazer lance · encerrar jogo (chama <code>close_match</code>).</p></article>
+    <article class="endpoint"><p><span class="method">POST / PUT</span> <code>/api/teams/:teamId/lineup-templates[/:id]</code> · coach</p><p>Escalação modelo do time, mesmo formato da escalação do jogo.</p></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/athletes/:id/rating-adjustment</code> · coach</p><pre>{"teamId":"…","value":3,"reason":"evolução no treino"}</pre></article>
+    <article class="endpoint"><p><span class="method">PUT</span> <code>/api/me/attendance/:eventId</code> · atleta</p><pre>{"status":"yes"}</pre><p>Só o próprio atleta, só eventos dos times dele.</p></article>
+    <article class="endpoint"><p><span class="method">REALTIME</span> canal privado <code>match:{eventId}</code></p><p>Broadcast de placar e lances para quem pode ler o time (Realtime Authorization com policy em <code>realtime.messages</code>). Plano grátis: 200 conexões simultâneas e 2 milhões de mensagens/mês, suficiente para o volume da atlética.</p></article>
+    <article class="endpoint"><p><span class="method">POST</span> <code>/api/auth/login</code> · <code>/api/auth/logout</code></p><p>Sem mudança (reaproveitado).</p></article>
+  </div>
+  <p class="muted"><strong>Leitura</strong> não tem rota de API: as pages chamam o banco no servidor (tabelas com RLS e RPCs). Se uma tela cliente precisar recarregar dados, usa Server Action ou <code>router.refresh()</code>.</p>
+</section>
+
+<section class="section" id="esportes">
+  <h2>C · Módulos de esporte</h2>
+<pre>// src/sports/types.ts
+export interface SportDefinition {
+  key: SportKey;                        // 'volleyball' | 'futsal' | 'football_society' | 'football_field' | 'basketball' | 'handball'
+  family: 'volleyball' | 'football' | 'basketball' | 'handball';
+  name: string;
+  playersOnField: number;
+  maxBench: number;
+  positions: { key: string; label: string; short: string }[];
+  formations: { key: string; label: string; slots: { key: string; label: string; x: number; y: number; positionHint?: string }[] }[];
+  score: { model: 'sets' | 'periods'; periods: number; validate(periods: Period[]): Issue[]; final(periods: Period[]): { us: number; them: number } };
+  stats: { key: string; label: string; group: string; polarity: 'positive' | 'neutral' | 'negative'; pairKey?: string; leader?: boolean }[];
+  rating(totals: Record&lt;string, number&gt;, games: number): { overall: number; attributes: Record&lt;string, number&gt; };
+  dashboardCards: DashboardCardKey[];   // ex.: 'set_balance' | 'goal_balance' | 'points_per_game'
+}
+// src/sports/registry.ts → { volleyball, futsal, ... }  ·  componentes de quadra via next/dynamic
+// scripts/generate-sport-seed.ts → supabase/seed/sports.sql (teste falha se divergir)</pre>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Esporte</th><th>Posições</th><th>Formações (slots)</th><th>Placar</th><th>Estatísticas</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Vôlei</strong></td><td>levantador, oposto, ponteiro, central, líbero</td><td>5-1, 6-2, 4-2 (P1–P6 + L) · reservas até 6</td><td>sets; melhor de 3 ou 5; 25 (15 no tie-break); 2 de diferença</td><td>pass_a/b/c, set_good/ok/bad, serve_ace/good/error, attack_kill/ok/error, block_point/ok/error, dig, reading_*, jump_*</td></tr>
+      <tr><td><strong>Futsal</strong></td><td>goleiro, fixo, ala, pivô</td><td>2-2, 3-1, 4-0 (5 slots) · reservas até 9</td><td>gols; 2 tempos (+ prorrogação/pênaltis opcionais)</td><td>goals, assists, shots_on, shots_off, tackles, fouls, yellow, red, saves, goals_conceded</td></tr>
+      <tr><td><strong>Fut7 / Society</strong></td><td>goleiro, zagueiro, lateral, meio, atacante</td><td>2-3-1, 3-2-1, 2-2-2 (7 slots)</td><td>gols; 2 tempos</td><td>futsal + minutes_played</td></tr>
+      <tr><td><strong>Futebol de campo</strong></td><td>goleiro, zagueiro, lateral, volante, meia, ponta, centroavante</td><td>4-4-2, 4-3-3, 3-5-2, 4-2-3-1 (11 slots) · até 5 substituições</td><td>gols; 2 tempos</td><td>society + passes_completed, offsides</td></tr>
+      <tr><td><strong>Basquete</strong></td><td>armador, ala-armador, ala, ala-pivô, pivô</td><td>titular 5 (PG, SG, SF, PF, C)</td><td>pontos por quarto (4) + prorrogações</td><td>fg2_made/att, fg3_made/att, ft_made/att, reb_off, reb_def, assists, steals, blocks, turnovers, fouls</td></tr>
+      <tr><td><strong>Handebol</strong></td><td>goleiro, ponta, armador, central, pivô</td><td>6-0 (goleiro + 6)</td><td>gols; 2 tempos</td><td>goals, shots, assists, saves, suspensions_2min, yellow, red</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Overall por esporte:</strong> vôlei mantém a lógica atual (base por posição + eficiência dos fundamentos); futebol pondera gols, assistências, desarmes, defesas (goleiro) e cartões; basquete usa eficiência (PTS + REB + AST + STL + BLK − arremessos errados − lances livres errados − TO) normalizada; handebol pondera gols, aproveitamento de arremesso e defesas. Fórmulas cobertas por testes unitários com casos conhecidos.</p>
+</section>
+
+<section class="section" id="perf">
+  <h2>D · Performance e custo zero</h2>
+  <div class="table-wrap"><table><thead><tr><th>Tema</th><th>Estratégia</th></tr></thead><tbody>
+    <tr><td>Latência</td><td>Vercel <code>gru1</code> + Supabase <code>sa-east-1</code>; <code>getClaims()</code> no proxy; uma RPC por tela.</td></tr>
+    <tr><td>Consultas</td><td>Índices acima; policies com <code>(select private.fn())</code>; agregação no banco; sem N+1 (nada de consulta por atleta em loop).</td></tr>
+    <tr><td>Renderização</td><td>RSC + <code>loading.tsx</code> + <code>Suspense</code> por bloco do dashboard; links pré-carregados.</td></tr>
+    <tr><td>JavaScript</td><td>Quadra/campo do esporte via <code>next/dynamic</code>; sem biblioteca de gráficos (SVG); ícones já tree-shaken (lucide).</td></tr>
+    <tr><td>Imagens</td><td>Redimensionamento no navegador (canvas → WebP 512 px); URL assinada com cache de 1 h; sem otimização paga.</td></tr>
+    <tr><td>Custo</td><td>Vercel Hobby, Supabase Free, GitHub Actions (CI + keep-alive diário). Nada pago. Uso comercial exige rever o plano da Vercel.</td></tr>
+    <tr><td>Limites a vigiar</td><td>Supabase Free: 500 MB banco, 1 GB storage (≈ 3.000 fotos de 300 KB), pausa após 7 dias sem uso (keep-alive resolve).</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="section" id="checklist">
+  <h2>Checklist do contrato</h2>
+  <div class="table-wrap"><table><tbody>
+    <tr><td>Autorização + testes negativos por papel (RLS)</td><td>Pendente (F1)</td></tr>
+    <tr><td>Idempotência dos PUT e transações das RPCs</td><td>Pendente (F4)</td></tr>
+    <tr><td>Seed de esportes sincronizado com o código</td><td>Pendente (F2)</td></tr>
+    <tr><td>Backfill conferido por SQL</td><td>Pendente (F3)</td></tr>
+    <tr><td>Fotos migradas para bucket privado</td><td>Pendente (F3)</td></tr>
+    <tr><td>Auditoria das ações sensíveis</td><td>Pendente (F1/F4)</td></tr>
+    <tr><td>Aplicação das migrations e deploy</td><td>Thiago (não autorizado por este documento)</td></tr>
+  </tbody></table></div>
+</section>
+
+</main></body></html>
