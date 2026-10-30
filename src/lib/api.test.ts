@@ -2,16 +2,19 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getUser = vi.fn();
-const createClient = vi.fn(async () => ({ auth: { getUser } }));
+const getAuthenticatorAssuranceLevel = vi.fn();
+const createClient = vi.fn(async () => ({
+  auth: { getUser, mfa: { getAuthenticatorAssuranceLevel } },
+}));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient }));
 
 const { authorize, hasSameOrigin, isUuid, pickFields, resolveResource, resources } =
   await import("@/lib/api");
 
-function request(headers: Record<string, string> = {}) {
+function request(headers: Record<string, string> = {}, method = "POST") {
   return new NextRequest("http://localhost:3000/api/players", {
-    method: "POST",
+    method,
     headers: { host: "localhost:3000", ...headers },
   });
 }
@@ -81,6 +84,10 @@ describe("hasSameOrigin", () => {
 describe("authorize", () => {
   beforeEach(() => {
     getUser.mockReset();
+    getAuthenticatorAssuranceLevel.mockReset();
+    getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal1" },
+    });
     createClient.mockClear();
   });
 
@@ -101,5 +108,30 @@ describe("authorize", () => {
     const result = await authorize(request({ origin: "http://localhost:3000" }));
     expect(result.error).toBeNull();
     expect(result.user?.id).toBe("u1");
+  });
+
+  it("devolve 401 quando a conta tem 2FA e a sessao ainda nao passou pelo codigo", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal2" },
+    });
+    const result = await authorize(request({ origin: "http://localhost:3000" }));
+    expect(result.error?.status).toBe(401);
+  });
+
+  it("libera quando a sessao ja passou pelo 2FA", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal2", nextLevel: "aal2" },
+    });
+    const result = await authorize(request({ origin: "http://localhost:3000" }));
+    expect(result.error).toBeNull();
+  });
+
+  it("GET nao exige Origin (navegador nao envia), mas exige sessao", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+    const result = await authorize(request({}, "GET"));
+    expect(result.error?.status).toBe(401);
+    expect(createClient).toHaveBeenCalled();
   });
 });

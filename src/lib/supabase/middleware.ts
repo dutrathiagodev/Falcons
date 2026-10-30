@@ -22,10 +22,11 @@ export const updateSession = async (request: NextRequest) => {
     },
   });
 
-  // Nothing may run between createServerClient and getUser(), or sessions get dropped.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Nothing may run between createServerClient and getClaims(), or sessions get dropped.
+  // getClaims() verifies the JWT locally (signing keys are cached), so there is no
+  // round trip to Supabase Auth on every navigation. API writes still use getUser().
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims;
 
   const { pathname } = request.nextUrl;
   const isLogin = pathname === "/login";
@@ -37,6 +38,20 @@ export const updateSession = async (request: NextRequest) => {
     url.pathname = "/login";
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  // Account has 2FA but this session has not passed it: only /login (code step) is allowed.
+  if (user && !isApi) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const pendingSecondFactor = aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2";
+
+    if (pendingSecondFactor) {
+      if (isLogin) return supabaseResponse;
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "?etapa=codigo";
+      return NextResponse.redirect(url);
+    }
   }
 
   if (user && isLogin) {

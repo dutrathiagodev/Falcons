@@ -1,3 +1,7 @@
+// Columns the UI reads. Deliberately excludes cpf and telefone: only the athlete form needs them.
+export const PLAYER_COLUMNS =
+  "id, nome, apelido, posicao, camisa, foto_url, status, data_nascimento, curso, altura, peso, ano, observacoes";
+
 export type PlayerRecord = {
   id: string;
   nome: string;

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { withSignedPhotos } from "@/lib/photos";
 import LineupClient from "@/components/sections/lineup/lineup";
 
 export default async function LineupPage() {
@@ -8,5 +9,5 @@ export default async function LineupPage() {
     .select("id, nome, posicao, camisa, foto_url")
     .order("nome");
 
-  return <LineupClient players={players || []} />;
+  return <LineupClient players={await withSignedPhotos(supabase, players || [])} />;
 }
