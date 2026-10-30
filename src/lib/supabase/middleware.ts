@@ -22,10 +22,11 @@ export const updateSession = async (request: NextRequest) => {
     },
   });
 
-  // Nothing may run between createServerClient and getUser(), or sessions get dropped.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Nothing may run between createServerClient and getClaims(), or sessions get dropped.
+  // getClaims() verifies the JWT locally (signing keys are cached), so there is no
+  // round trip to Supabase Auth on every navigation. API writes still use getUser().
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims;
 
   const { pathname } = request.nextUrl;
   const isLogin = pathname === "/login";
