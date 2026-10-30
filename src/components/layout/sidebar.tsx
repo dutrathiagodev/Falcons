@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   LayoutDashboard,
   LogOut,
+  ShieldCheck,
   Menu,
   Users,
   Volleyball,
@@ -126,6 +127,19 @@ export default function Sidebar() {
               );
             })}
           </nav>
+
+          <Link
+            href="/conta/seguranca"
+            className={cn("sidebar-link", pathname === "/conta/seguranca" && "is-active")}
+          >
+            <span className="sidebar-link-icon">
+              <ShieldCheck size={18} />
+            </span>
+            <span className="sidebar-link-text">
+              <strong>Seguranca</strong>
+              <small>Verificacao em duas etapas</small>
+            </span>
+          </Link>
 
           <button className="btn btn-secondary" type="button" onClick={handleLogout}>
             <LogOut size={16} />

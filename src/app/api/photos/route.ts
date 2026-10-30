@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { authorize, fail } from "@/lib/api";
+import { PHOTO_BUCKET } from "@/lib/photos";
 
-const BUCKET = "fotos-jogadores";
 const MAX_BYTES = 2 * 1024 * 1024;
 const EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
   const path = `${auth.user.id}/${crypto.randomUUID()}.${extension}`;
   const { error } = await auth.supabase.storage
-    .from(BUCKET)
+    .from(PHOTO_BUCKET)
     .upload(path, file, { contentType: file.type });
 
   if (error) {
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     return fail("Nao foi possivel enviar a foto.", 400);
   }
 
-  const { data } = auth.supabase.storage.from(BUCKET).getPublicUrl(path);
-  return NextResponse.json({ url: data.publicUrl }, { status: 201 });
+  // The bucket is private: store the path, show the photo through a short-lived signed URL.
+  const { data } = await auth.supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, 60 * 60);
+  return NextResponse.json({ path, url: data?.signedUrl ?? null }, { status: 201 });
 }

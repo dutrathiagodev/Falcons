@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { withSignedPhotos } from "@/lib/photos";
 import { PLAYER_COLUMNS } from "@/lib/volleyball";
 import StatisticsClient from "@/components/sections/statistics/statistics";
 
@@ -14,7 +15,7 @@ export default async function StatisticsPage() {
   return (
     <StatisticsClient
       initialEvents={events || []}
-      players={players || []}
+      players={await withSignedPhotos(supabase, players || [])}
       initialPerformance={performance || []}
     />
   );

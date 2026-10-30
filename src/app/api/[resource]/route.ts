@@ -20,7 +20,9 @@ export async function POST(request: NextRequest, { params }: Context) {
       ? table.upsert([body], { onConflict: config.upsertOn })
       : table.insert([body]);
 
-  const { data, error } = await query.select().single();
+  const { data, error } = await query
+    .select("returning" in config ? config.returning : "*")
+    .single();
   if (error) {
     console.error(`[api] insert ${config.table}:`, error.message);
     return fail("Nao foi possivel salvar. Verifique os dados.", 400);
